@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F3C23E">
+<title>AutoPanel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#F3C23E;--gold-2:#E2A91C;--gold-deep:#B9860C;
+  --ink:#1A1404;--ink-2:#4A3B12;--muted:#7D6A2E;
+  --card:#FFFDF7;--white:#FFFFFF;--edge:#E4D3A0;
+  --green:#1E9E6A;--red:#D64545;--blue:#2F6FD6;
+  --r-xl:26px;--r-lg:20px;--r-md:16px;--r-sm:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Figtree',system-ui,sans-serif;color:var(--ink);min-height:100vh;
+  background:radial-gradient(120% 70% at 50% -10%,#FFE38A 0%,transparent 60%),linear-gradient(180deg,#F7CF55 0%,var(--gold) 45%,var(--gold-2) 100%);
+  background-attachment:fixed;padding-bottom:calc(100px + env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+h1,h2,h3,.display{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.02em;line-height:1.1}
+button,input,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:12px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* ---------- 3D white button ---------- */
+.b3{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  background:var(--white);color:var(--ink);font-weight:800;font-size:.95rem;
+  border-radius:var(--r-md);padding:15px 20px;width:100%;
+  box-shadow:0 6px 0 var(--edge),0 12px 22px rgba(90,60,0,.22);
+  transition:transform .12s,box-shadow .12s;user-select:none;
+}
+.b3:hover{transform:translateY(-1px)}
+.b3:active{transform:translateY(5px);box-shadow:0 1px 0 var(--edge),0 4px 8px rgba(90,60,0,.18)}
+.b3.sm{width:auto;padding:11px 16px;font-size:.85rem;border-radius:var(--r-sm);box-shadow:0 4px 0 var(--edge),0 8px 14px rgba(90,60,0,.18)}
+.b3.sm:active{box-shadow:0 1px 0 var(--edge),0 3px 6px rgba(90,60,0,.16)}
+
+/* ---------- Header ---------- */
+.top{position:sticky;top:0;z-index:50;padding-top:env(safe-area-inset-top);background:rgba(243,194,62,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;padding-bottom:14px}
+.who{display:flex;align-items:center;gap:12px;min-width:0}
+.av{width:44px;height:44px;border-radius:15px;flex-shrink:0;display:grid;place-items:center;background:var(--ink);color:var(--gold);font-family:'Bricolage Grotesque';font-weight:800;font-size:1.05rem;box-shadow:0 4px 0 #0a0800}
+.who .nm{font-weight:800;font-size:.98rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who .rl{font-size:.75rem;color:var(--ink-2);font-weight:600;margin-top:2px}
+.bal{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;border-radius:999px;background:var(--white);font-weight:800;font-size:.88rem;box-shadow:0 4px 0 var(--edge),0 8px 14px rgba(90,60,0,.18);transition:transform .12s,box-shadow .12s}
+.bal:active{transform:translateY(3px);box-shadow:0 1px 0 var(--edge)}
+.bal .plus{width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--gold);display:grid;place-items:center}
+.bal .plus .ic{width:16px;height:16px;stroke-width:3}
+
+/* ---------- Pages ---------- */
+main{padding-top:20px}
+.page{display:none}
+.page.on{display:block;animation:rise .4s cubic-bezier(.2,.7,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.head{margin-bottom:18px;padding:0 2px}
+.head h2{font-size:1.8rem}
+.head p{color:var(--ink-2);font-size:.9rem;margin-top:6px;line-height:1.5;font-weight:600}
+
+/* ---------- Hero ---------- */
+.hero{position:relative;overflow:hidden;border-radius:var(--r-xl);padding:24px;background:var(--ink);color:var(--gold);box-shadow:0 10px 0 #0a0800,0 18px 30px rgba(60,40,0,.3)}
+.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(243,194,62,.35),transparent 70%)}
+.hero small{color:#E9D9A6;font-size:.82rem;font-weight:700;letter-spacing:.01em}
+.hero .amt{font-family:'Bricolage Grotesque';font-weight:800;font-size:2.5rem;margin:6px 0 20px;letter-spacing:-.03em;color:#FFF6D6}
+.hero .b3{background:var(--white);color:var(--ink)}
+.hero-wrap{margin-bottom:26px;padding-bottom:4px}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
+.stat{background:var(--card);border-radius:var(--r-lg);padding:14px 12px;box-shadow:0 5px 0 var(--edge)}
+.stat .ico-s{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--ink);color:var(--gold);margin-bottom:10px}
+.stat .ico-s .ic{width:18px;height:18px}
+.stat .n{font-family:'Bricolage Grotesque';font-weight:800;font-size:1.5rem;line-height:1}
+.stat .t{font-size:.75rem;color:var(--muted);margin-top:4px;font-weight:700}
+.stat .meter{height:6px;border-radius:6px;background:#F1E6BF;margin-top:10px;overflow:hidden}
+.stat .meter span{display:block;height:100%;width:0;background:var(--ink);border-radius:6px;transition:width .7s cubic-bezier(.2,.7,.2,1)}
+
+.section-title{font-size:1.1rem;margin:0 2px 12px}
+
+/* ---------- Rich rows ---------- */
+.rich{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px;margin-bottom:12px;border-radius:var(--r-lg);background:var(--card);box-shadow:0 5px 0 var(--edge),0 10px 18px rgba(90,60,0,.1);transition:transform .12s,box-shadow .12s}
+.rich:active{transform:translateY(4px);box-shadow:0 1px 0 var(--edge)}
+.tile{width:52px;height:52px;border-radius:var(--r-md);flex-shrink:0;display:grid;place-items:center;background:var(--ink);color:var(--gold);font-family:'Bricolage Grotesque';font-weight:800;font-size:1.15rem}
+.tile .ic{width:24px;height:24px}
+.tile.light{background:var(--gold);color:var(--ink)}
+.tile.red{background:var(--red);color:#fff}
+.tile.green{background:var(--green);color:#fff}
+.rich .body{flex:1;min-width:0}
+.rich .ttl{font-weight:800;font-size:1rem}
+.rich .sub{font-size:.8rem;color:var(--muted);margin-top:3px;line-height:1.4;font-weight:600}
+.rich .price{font-family:'Bricolage Grotesque';font-weight:800;font-size:.95rem;white-space:nowrap}
+.rich .chev{color:var(--ink-2)}
+
+/* ---------- Segment ---------- */
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:rgba(255,255,255,.35);border-radius:var(--r-md);padding:6px;margin-bottom:20px}
+.seg button{display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 6px;border-radius:12px;font-weight:800;font-size:.85rem;color:var(--ink-2);transition:.2s}
+.seg button .ic{width:18px;height:18px}
+.seg button.on{background:var(--white);color:var(--ink);box-shadow:0 4px 0 var(--edge),0 8px 14px rgba(90,60,0,.16);transform:translateY(-1px)}
+
+/* ---------- RAM tiles ---------- */
+.ram-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:12px}
+.ram{position:relative;padding:18px 10px 16px;border-radius:var(--r-lg);text-align:center;background:var(--card);box-shadow:0 5px 0 var(--edge),0 10px 18px rgba(90,60,0,.1);transition:transform .12s,box-shadow .12s}
+.ram:active{transform:translateY(4px);box-shadow:0 1px 0 var(--edge)}
+.ram .big{font-family:'Bricolage Grotesque';font-weight:800;font-size:1.8rem;line-height:1}
+.ram .big small{font-size:.8rem;font-weight:700;margin-left:3px;color:var(--ink-2)}
+.ram .p{display:inline-block;font-size:.8rem;font-weight:800;margin-top:12px;padding:6px 10px;border-radius:999px;background:var(--gold)}
+.ram.wide{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;text-align:left;padding:20px;background:var(--ink);color:var(--gold)}
+.ram.wide .big{font-size:1.5rem;color:#FFF6D6}
+.ram.wide .p{margin:0;background:var(--white);color:var(--ink)}
+.ram.wide .sub{color:#E9D9A6;font-size:.8rem;font-weight:600;margin-top:6px}
+.pill{position:absolute;top:-8px;right:12px;background:var(--white);color:var(--ink);font-size:.66rem;font-weight:800;padding:4px 9px;border-radius:999px;box-shadow:0 2px 0 var(--edge)}
+.ram.wide .pill{background:var(--gold)}
+
+/* ---------- Cards ---------- */
+.card{background:var(--card);border-radius:var(--r-lg);padding:16px;margin-bottom:14px;box-shadow:0 5px 0 var(--edge),0 10px 18px rgba(90,60,0,.1)}
+.card .row1{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.card .nm{display:flex;align-items:center;gap:10px;font-family:'Bricolage Grotesque';font-weight:800;font-size:1.08rem;min-width:0;overflow:hidden;white-space:nowrap}
+.card .nm span{overflow:hidden;text-overflow:ellipsis}
+.card .nm .tile{width:40px;height:40px;border-radius:12px}
+.card .nm .tile .ic{width:20px;height:20px}
+.badge{font-size:.74rem;font-weight:800;padding:6px 11px;border-radius:999px;background:var(--gold);white-space:nowrap}
+.badge.warn{background:#FFD9A8}
+.badge.dead{background:#F9C7C7}
+.desc{color:var(--ink-2);font-size:.86rem;line-height:1.5;font-weight:600}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:9px 14px;font-size:.86rem;padding-top:12px;border-top:2px dashed #EAD9A4}
+.kv span:nth-child(odd){color:var(--muted);font-weight:700}
+.kv span:nth-child(even){font-weight:800;text-align:right;word-break:break-all}
+.role-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px}
+
+/* ---------- Chat & AI ---------- */
+.chat,.ai{display:flex;flex-direction:column;height:calc(100dvh - 300px);min-height:360px}
+.feed{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:16px;background:rgba(255,255,255,.3);border-radius:var(--r-xl);box-shadow:inset 0 2px 0 rgba(255,255,255,.4)}
+.bubble{max-width:80%;padding:11px 14px;border-radius:18px;font-size:.92rem;line-height:1.45;font-weight:600;word-break:break-word;box-shadow:0 4px 0 var(--edge)}
+.bubble .who{font-size:.72rem;font-weight:800;color:var(--muted);margin-bottom:3px}
+.bubble .t{font-size:.66rem;color:var(--muted);margin-top:5px;text-align:right;font-weight:700}
+.bubble img,.bubble video{max-width:100%;border-radius:12px;margin-top:6px;display:block}
+.bubble a{color:var(--blue);font-weight:800}
+.bubble.other{align-self:flex-start;background:var(--white);border-bottom-left-radius:6px}
+.bubble.me{align-self:flex-end;background:var(--ink);color:#FFF6D6;border-bottom-right-radius:6px;box-shadow:0 4px 0 #0a0800}
+.bubble.me .who,.bubble.me .t{color:var(--gold)}
+.bubble.me a{color:var(--gold)}
+.bubble code{background:#EFE2B4;padding:2px 6px;border-radius:4px;font-size:.85em;color:var(--ink)}
+.bubble pre{background:#EFE2B4;padding:10px;border-radius:8px;overflow-x:auto;margin:6px 0;font-size:.8em}
+.bubble .copy-btn{font-size:.65rem;margin-top:6px;background:transparent;border:1px solid var(--edge);color:var(--muted);padding:2px 8px;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:800}
+.bubble .copy-btn:hover{border-color:var(--ink);color:var(--ink)}
+.composer{display:flex;gap:10px;align-items:center;margin-top:14px}
+.composer input[type=text]{flex:1;min-width:0;padding:15px 18px;border-radius:999px;background:var(--white);border:0;outline:none;font-weight:600;box-shadow:inset 0 3px 0 #EFE2B4}
+.composer input[type=text]::placeholder{color:#A8954F}
+.icon-btn{width:50px;height:50px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;background:var(--white);box-shadow:0 5px 0 var(--edge),0 10px 16px rgba(90,60,0,.18);transition:transform .12s,box-shadow .12s;position:relative;overflow:hidden}
+.icon-btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--edge)}
+.icon-btn.dark{background:var(--ink);color:var(--gold);box-shadow:0 5px 0 #0a0800,0 10px 16px rgba(60,40,0,.25)}
+.icon-btn.dark:active{box-shadow:0 1px 0 #0a0800}
+.icon-btn.dark:disabled{opacity:.5;pointer-events:none}
+.icon-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.ai-typing{display:flex;gap:4px;align-items:center;padding:14px 18px!important}
+.ai-typing .dot{width:8px;height:8px;border-radius:50%;background:var(--ink);animation:bounce 1.2s infinite}
+.ai-typing .dot:nth-child(2){animation-delay:.2s}
+.ai-typing .dot:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-6px);opacity:1}}
+
+.empty{text-align:center;color:var(--ink-2);padding:44px 18px;font-size:.92rem;font-weight:700;line-height:1.5}
+.empty .tile{margin:0 auto 12px;width:64px;height:64px;border-radius:20px}
+.empty .tile .ic{width:30px;height:30px}
+
+/* ---------- Bottom nav ---------- */
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;width:min(calc(100% - 28px),520px);display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:7px;background:var(--ink);border-radius:24px;box-shadow:0 8px 0 #0a0800,0 16px 30px rgba(60,40,0,.35)}
+.nav button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 9px;border-radius:17px;color:#BFA863;font-size:.68rem;font-weight:800;transition:transform .12s,background .2s,color .2s}
+.nav button .ic{width:22px;height:22px}
+.nav button:active{transform:scale(.94)}
+.nav button.on{color:var(--ink);background:var(--white);box-shadow:0 4px 0 var(--edge),0 6px 12px rgba(0,0,0,.25)}
+
+/* ---------- Sheet ---------- */
+.scrim{position:fixed;inset:0;z-index:100;background:rgba(40,28,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center}
+.scrim.on{display:flex}
+.sheet{width:100%;max-width:520px;max-height:90dvh;overflow-y:auto;background:var(--gold);border-radius:var(--r-xl) var(--r-xl) 0 0;padding:12px 20px calc(24px + env(safe-area-inset-bottom));animation:up .32s cubic-bezier(.2,.7,.2,1);box-shadow:0 -6px 30px rgba(60,40,0,.3)}
+@keyframes up{from{transform:translateY(50px);opacity:0}to{transform:none;opacity:1}}
+.grab{width:44px;height:5px;border-radius:5px;background:var(--gold-deep);opacity:.5;margin:0 auto 16px}
+.sheet h3{font-size:1.35rem;margin-bottom:16px}
+.summary{background:var(--card);border-radius:var(--r-md);padding:4px 16px;margin-bottom:16px;box-shadow:0 4px 0 var(--edge)}
+.summary div{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:2px dashed #EAD9A4;font-size:.9rem;font-weight:700}
+.summary div:last-child{border:0}
+.summary span{color:var(--muted)}
+.summary b{font-weight:800}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.8rem;color:var(--ink-2);font-weight:800;margin-bottom:7px}
+.field input,.field select{width:100%;padding:14px 16px;border-radius:var(--r-md);background:var(--white);border:0;outline:none;font-weight:700;box-shadow:inset 0 3px 0 #EFE2B4;appearance:none}
+.field input:focus,.field select:focus{box-shadow:inset 0 0 0 3px var(--ink)}
+.field select{background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);background-position:calc(100% - 20px) 56%,calc(100% - 14px) 56%;background-size:6px 6px;background-repeat:no-repeat}
+.qris{background:var(--white);border-radius:var(--r-lg);padding:16px;text-align:center;margin-bottom:14px;box-shadow:0 5px 0 var(--edge)}
+.qris img{width:100%;max-width:200px;border-radius:12px;display:block;margin:0 auto}
+.qris .total{font-weight:800;margin-top:10px}
+.drop{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;border-radius:var(--r-md);padding:20px;text-align:center;color:var(--ink-2);font-size:.88rem;font-weight:800;cursor:pointer;background:rgba(255,255,255,.45);border:2px dashed var(--gold-deep);margin-bottom:16px}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop img{max-width:100%;max-height:150px;border-radius:12px;margin-top:8px;display:none}
+.drop img.on{display:block}
+.row-btns{display:grid;grid-template-columns:1fr 1.5fr;gap:12px;margin-top:6px}
+.hide{display:none!important}
+
+/* ---------- Toast ---------- */
+.toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));z-index:200;transform:translate(-50%,20px);opacity:0;background:var(--white);color:var(--ink);padding:13px 20px;border-radius:16px;font-weight:800;font-size:.88rem;box-shadow:0 5px 0 var(--edge),0 14px 26px rgba(60,40,0,.3);transition:.35s cubic-bezier(.2,.7,.2,1);pointer-events:none;max-width:calc(100% - 32px);display:flex;align-items:center;gap:10px}
+.toast .ic{color:var(--green)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:var(--ink);color:var(--gold)}
+.toast.err .ic{color:var(--red)}
+
+/* ---------- Mode layar penuh ---------- */
+body.fs{padding-bottom:0;overflow:hidden}
+body.fs .top,body.fs .nav{display:none}
+.page.full.on{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;overflow:hidden;
+  padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 14px);
+  background:linear-gradient(180deg,#F7CF55 0%,var(--gold) 45%,var(--gold-2) 100%)}
+.page.full .chat,.page.full .ai{flex:1;height:auto;min-height:0;width:100%;max-width:720px;margin:0 auto}
+.page.full .feed{flex:1;min-height:0;border-radius:var(--r-lg)}
+.page.full .composer{margin-top:12px}
+.page.full .scroll{flex:1;overflow-y:auto;padding-bottom:20px}
+.page.full .wrap-in{width:100%;max-width:720px;margin:0 auto;display:flex;flex-direction:column;flex:1;min-height:0}
+.fs-head{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-shrink:0}
+.fs-head h2{font-size:1.6rem}
+.back{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:var(--white);box-shadow:0 4px 0 var(--edge);flex-shrink:0;transition:transform .12s,box-shadow .12s}
+.back:active{transform:translateY(3px);box-shadow:0 1px 0 var(--edge)}
+.back .ic{width:22px;height:22px}
+.hd-r{display:flex;align-items:center;gap:10px}
+.gear{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:var(--ink);color:var(--gold);box-shadow:0 4px 0 #0a0800;flex-shrink:0;transition:transform .12s,box-shadow .12s}
+.gear:active{transform:translateY(3px);box-shadow:0 1px 0 #0a0800}
+.av img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.prof{display:flex;align-items:center;gap:16px;background:var(--card);border-radius:var(--r-xl);padding:18px;margin-bottom:18px;box-shadow:0 5px 0 var(--edge)}
+.big-av{width:84px;height:84px;border-radius:28px;flex-shrink:0;display:grid;place-items:center;overflow:hidden;background:var(--ink);color:var(--gold);font-family:'Bricolage Grotesque';font-weight:800;font-size:2rem;box-shadow:0 6px 0 #0a0800}
+.big-av img{width:100%;height:100%;object-fit:cover}
+.pn{font-family:'Bricolage Grotesque';font-weight:800;font-size:1.35rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pu{font-weight:700;color:var(--ink-2);margin-top:4px;font-size:.92rem}
+.page.full label.rich{position:relative;cursor:pointer}
+.hid-file{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.page.full .rich{margin-bottom:12px}
+.icon-reset{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:var(--white);box-shadow:0 4px 0 var(--edge);transition:transform .12s,box-shadow .12s;flex-shrink:0}
+.icon-reset:active{transform:translateY(3px);box-shadow:0 1px 0 var(--edge)}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:380px){.hero .amt{font-size:2.1rem}.nav button{font-size:.6rem}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="who">
+      <div class="av" id="av">?</div>
+      <div style="min-width:0">
+        <div class="nm" id="uname">Belum login</div>
+        <div class="rl" id="urole">Login untuk mulai belanja</div>
+      </div>
+    </div>
+    <div class="hd-r">
+      <button class="bal" id="balBtn" onclick="openDeposit()"><span id="balTxt">Rp 0</span><span class="plus" data-ic="plus"></span></button>
+      <button class="gear" onclick="go('settings')" aria-label="Pengaturan" data-ic="gear"></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- BERANDA -->
+  <section class="page on" id="p-home">
+    <div class="hero-wrap">
+      <div class="hero">
+        <small>Saldo kamu</small>
+        <div class="amt" id="heroAmt">Rp 0</div>
+        <button class="b3" onclick="openDeposit()"><span class="ic-slot" data-ic="wallet"></span>Isi saldo</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="ico-s" data-ic="server"></div><div class="n" id="sPanel">0</div><div class="t">Panel</div><div class="meter"><span id="mPanel"></span></div></div>
+      <div class="stat"><div class="ico-s" data-ic="phone"></div><div class="n" id="sNokos">0</div><div class="t">Nokos</div><div class="meter"><span id="mNokos"></span></div></div>
+      <div class="stat"><div class="ico-s" data-ic="shield"></div><div class="n" id="sRole">0</div><div class="t">Role</div><div class="meter"><span id="mRole"></span></div></div>
+    </div>
+
+    <h3 class="section-title">Mau beli apa?</h3>
+    <button class="rich" onclick="showTab('panel')">
+      <div class="tile" data-ic="server"></div>
+      <div class="body"><div class="ttl">Panel server</div><div class="sub">Pilih RAM, aktif 30 hari</div></div>
+      <span class="chev" data-ic="chevron"></span>
+    </button>
+    <button class="rich" onclick="showTab('nokos')">
+      <div class="tile light" data-ic="phone"></div>
+      <div class="body"><div class="ttl">Nokos OTP</div><div class="sub">Nomor sementara, kode masuk otomatis</div></div>
+      <span class="chev" data-ic="chevron"></span>
+    </button>
+    <button class="rich" onclick="showTab('role')">
+      <div class="tile" data-ic="crown"></div>
+      <div class="body"><div class="ttl">Role</div><div class="sub">Menu khusus dan limit create panel harian</div></div>
+      <span class="chev" data-ic="chevron"></span>
+    </button>
+  </section>
+
+  <!-- ORDER -->
+  <section class="page" id="p-order">
+    <div class="head"><h2>Order</h2><p id="orderDesc"></p></div>
+    <div class="seg" id="seg">
+      <button data-t="panel" onclick="showTab('panel')"><span data-ic="server"></span>Panel</button>
+      <button data-t="nokos" onclick="showTab('nokos')"><span data-ic="phone"></span>Nokos</button>
+      <button data-t="role" onclick="showTab('role')"><span data-ic="shield"></span>Role</button>
+    </div>
+    <div id="orderBody"></div>
+    <p id="nokosNote" class="hide" style="color:var(--ink-2);font-size:.78rem;margin-top:14px;text-align:center;font-weight:700">Harga dan layanan mengikuti setting SMS API di admin.</p>
+  </section>
+
+  <!-- PANEL SAYA -->
+  <section class="page" id="p-saya">
+    <div class="head"><h2>Panel saya</h2><p>Data panel tersimpan aman. Otomatis dihapus saat masa aktif habis.</p></div>
+    <div id="limitBox"></div>
+    <div id="panelList"></div>
+  </section>
+
+  <!-- CHAT -->
+  <section class="page full" id="p-chat">
+    <div class="fs-head"><button class="back" onclick="go('home')" aria-label="Kembali" data-ic="back"></button><h2>Public chat</h2></div>
+    <div class="chat">
+      <div class="feed" id="feed"></div>
+      <div class="composer">
+        <label class="icon-btn" title="Kirim file"><span data-ic="clip"></span><input type="file" id="chatFile" accept="image/*,video/*,.pdf,.zip,.txt" onchange="sendFile(event)"></label>
+        <input type="text" id="chatIn" placeholder="Tulis pesan..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="icon-btn dark" onclick="sendChat()" aria-label="Kirim"><span data-ic="send"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI -->
+  <section class="page full" id="p-ai">
+    <div class="fs-head">
+      <button class="back" onclick="go('home')" aria-label="Kembali" data-ic="back"></button>
+      <h2>AI assistant</h2>
+      <button class="icon-reset" onclick="resetAI()" aria-label="Reset chat" title="Reset chat" style="margin-left:auto;">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
+    </div>
+    <div class="ai">
+      <div class="feed" id="aiFeed"></div>
+      <div class="composer">
+        <input type="text" id="aiIn" placeholder="Tanya AI..." onkeydown="if(event.key==='Enter')sendAI()" autocomplete="off">
+        <button class="icon-btn dark" onclick="sendAI()" aria-label="Kirim" id="aiSendBtn"><span data-ic="send"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PENGATURAN -->
+  <section class="page full" id="p-settings">
+    <div class="fs-head"><button class="back" onclick="go('home')" aria-label="Kembali" data-ic="back"></button><h2>Pengaturan</h2></div>
+    <div class="scroll">
+      <div class="prof">
+        <div class="big-av" id="setAv"></div>
+        <div style="min-width:0"><div class="pn" id="setName">-</div><div class="pu" id="setUser">-</div></div>
+      </div>
+      <label class="rich"><div class="tile" data-ic="camera"></div><div class="body"><div class="ttl">Ubah foto</div><div class="sub">Foto profil, maksimal 2MB</div></div><span class="chev" data-ic="chevron"></span><input class="hid-file" type="file" accept="image/*" onchange="changePhoto(event)"></label>
+      <button class="rich" onclick="openSet('name')"><div class="tile light" data-ic="pen"></div><div class="body"><div class="ttl">Ubah nama</div><div class="sub">Nama yang tampil di aplikasi</div></div><span class="chev" data-ic="chevron"></span></button>
+      <button class="rich" onclick="openSet('user')"><div class="tile" data-ic="at"></div><div class="body"><div class="ttl">Ubah username</div><div class="sub">Dipakai untuk login dan panel</div></div><span class="chev" data-ic="chevron"></span></button>
+      <button class="rich" onclick="openPwd()"><div class="tile light" data-ic="key"></div><div class="body"><div class="ttl">Reset password</div><div class="sub">Buat password baru untuk akun ini</div></div><span class="chev" data-ic="chevron"></span></button>
+      <button class="rich" onclick="logout()"><div class="tile red" data-ic="logout"></div><div class="body"><div class="ttl">Keluar akun</div><div class="sub">Kembali ke halaman login</div></div><span class="chev" data-ic="chevron"></span></button>
+    </div>
+  </section>
+</main>
+
+<nav class="nav">
+  <button class="on" data-n="home" onclick="go('home')"><span data-ic="home"></span>Beranda</button>
+  <button data-n="order" onclick="showTab('panel')"><span data-ic="cart"></span>Order</button>
+  <button data-n="saya" onclick="go('saya')"><span data-ic="server"></span>Panel</button>
+  <button data-n="chat" onclick="go('chat')"><span data-ic="message"></span>Chat</button>
+  <button data-n="ai" onclick="go('ai')"><span data-ic="bot"></span>AI</button>
+</nav>
+
+<!-- SHEET: DEPOSIT -->
+<div class="scrim" id="mDeposit" onclick="if(event.target===this)close('mDeposit')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Isi saldo</h3>
+    <div class="field"><label for="depAmt">Nominal (Rp)</label><input type="number" id="depAmt" placeholder="contoh: 50000" min="1000" inputmode="numeric"></div>
+    <div class="qris"><img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=QRIS-DEMO-AUTOPANEL" alt="QRIS"><div class="total">Scan untuk transfer</div></div>
+    <label class="drop"><span data-ic="upload"></span>Upload bukti transfer<input type="file" accept="image/*" onchange="preview(event,'depPrev')"><img id="depPrev" alt=""></label>
+    <div class="row-btns"><button class="b3" onclick="close('mDeposit')">Batal</button><button class="b3" onclick="submitDeposit()">Kirim ke admin</button></div>
+  </div>
+</div>
+
+<!-- SHEET: ORDER -->
+<div class="scrim" id="mOrder" onclick="if(event.target===this)close('mOrder')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3 id="oTitle">Konfirmasi order</h3>
+    <div class="summary" id="oSum"></div>
+    <div id="oPanelFields" class="hide">
+      <div class="field"><label for="oUser">Username panel</label><input id="oUser" placeholder="minimal 3 karakter"></div>
+      <div class="field"><label for="oServer">Nama server</label><input id="oServer" placeholder="contoh: server-budi"></div>
+    </div>
+    <div class="field"><label for="oPay">Metode pembayaran</label>
+      <select id="oPay" onchange="togglePay()"><option value="saldo">Saldo (potong otomatis)</option><option value="qris">QRIS (upload bukti)</option></select>
+    </div>
+    <div id="oQris" class="hide">
+      <div class="qris"><img id="oQrImg" alt="QRIS"><div class="total" id="oQrTot"></div></div>
+      <label class="drop"><span data-ic="upload"></span>Upload bukti<input type="file" accept="image/*" onchange="preview(event,'oPrev')"><img id="oPrev" alt=""></label>
+    </div>
+    <div class="row-btns"><button class="b3" onclick="close('mOrder')">Batal</button><button class="b3" onclick="submitOrder()">Order sekarang</button></div>
+  </div>
+</div>
+
+<!-- SHEET: UBAH NAMA / USERNAME -->
+<div class="scrim" id="mSet" onclick="if(event.target===this)close('mSet')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3 id="setTitle">Ubah</h3>
+    <div class="field"><label id="setLabel" for="setInput"></label><input id="setInput" type="text" autocomplete="off"></div>
+    <div class="row-btns"><button class="b3" onclick="close('mSet')">Batal</button><button class="b3" onclick="saveSet()">Simpan</button></div>
+  </div>
+</div>
+
+<!-- SHEET: RESET PASSWORD -->
+<div class="scrim" id="mPwd" onclick="if(event.target===this)close('mPwd')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Reset password</h3>
+    <div class="field"><label for="pw1">Password baru</label><input type="password" id="pw1" placeholder="minimal 6 karakter"></div>
+    <div class="field"><label for="pw2">Ulangi password baru</label><input type="password" id="pw2"></div>
+    <div class="row-btns"><button class="b3" onclick="close('mPwd')">Batal</button><button class="b3" onclick="savePwd()">Simpan password</button></div>
+  </div>
+</div>
+
+<!-- SHEET: LIMIT HARIAN -->
+<div class="scrim" id="mLimit" onclick="if(event.target===this)close('mLimit')">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>🎁 Limit panel gratis</h3>
+    <div id="limitList"></div>
+    <p style="color:var(--ink-2);font-size:.78rem;margin:14px 0;text-align:center;font-weight:700">Limit direset otomatis setiap jam 00.00.</p>
+    <div class="row-btns"><button class="b3" onclick="close('mLimit')">Tutup</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- Ikon ---------- */
+const ICONS = {
+  home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  cart:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l3 12h11l2-8H6"/>',
+  server:'<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01"/>',
+  phone:'<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/>',
+  message:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  bot:'<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',
+  wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M16 13h2"/><path d="M6 6l10-3"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  crown:'<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>',
+  star:'<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2-4.5-4.4 6.2-.9z"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.3-5 6.5-5s5.7 1.5 6.5 5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  upload:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+  bolt:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  clip:'<path d="M21 11l-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/>',
+  send:'<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+  chevron:'<path d="M9 6l6 6-6 6"/>',
+  check:'<path d="M5 12l5 5L20 7"/>',
+  inbox:'<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 2h6l1-2h5"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  camera:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  pen:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+  at:'<circle cx="12" cy="12" r="4"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1"/>',
+  key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+  logout:'<path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 17l-5-5 5-5M5 12h11"/>',
+  back:'<path d="M15 6l-6 6 6 6"/>'
+};
+const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+function paintIcons(root = document) {
+  root.querySelectorAll('[data-ic]').forEach(el => { el.innerHTML = ic(el.dataset.ic); });
+}
+
+/* ---------- Helpers ---------- */
+const $ = id => document.getElementById(id);
+const rp = n => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DB = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+};
+const readFile = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(f); });
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+/* ---------- Data ---------- */
+const PANELS = [
+  {ram:'1 GB',harga:1000},{ram:'2 GB',harga:2000},{ram:'3 GB',harga:3000},{ram:'4 GB',harga:4000},
+  {ram:'5 GB',harga:5000},{ram:'6 GB',harga:6000},{ram:'7 GB',harga:7000},{ram:'8 GB',harga:8000},
+  {ram:'9 GB',harga:9000},{ram:'10 GB',harga:10000},{ram:'UNLIMITED',harga:12000,unli:true}
+];
+const NOKOS = [
+  {name:'WhatsApp',harga:3000},{name:'Telegram',harga:2500},{name:'Instagram',harga:3500},{name:'Facebook',harga:3000},
+  {name:'Google',harga:4000},{name:'Twitter/X',harga:3500},{name:'Discord',harga:3000},{name:'TikTok',harga:3500}
+];
+const ROLES = [
+  {name:'Reseller',icon:'cart',harga:10000,limit:2,desc:'Menu khusus reseller, free panel 2x sehari.'},
+  {name:'Admin',icon:'shield',harga:25000,limit:3,desc:'Menu khusus admin, free panel 3x sehari.'},
+  {name:'Owner',icon:'crown',harga:35000,limit:5,desc:'Menu khusus owner, free panel 5x sehari.'},
+  {name:'Partner',icon:'users',harga:45000,limit:7,desc:'Menu khusus partner, panel 7x sehari.'},
+  {name:'Tangan Kanan',icon:'star',harga:55000,limit:10,desc:'Menu khusus tangan kanan, panel 10x sehari.'}
+];
+const TAB_DESC = {
+  panel:'Pilih RAM, bayar pakai saldo atau QRIS.',
+  nokos:'Pilih layanan, kode OTP otomatis dari SMS API.',
+  role:'Beli role untuk menu khusus dan limit create panel harian.'
+};
+const AI_ENDPOINT = 'https://apiii-xrina.my.id/ai/gpt';
+const AI_HISTORY_KEY = () => 'ai_history_' + (me || 'guest');
+
+/* ---------- State ---------- */
+let me = DB.get('current_user', null);
+let order = {type:null, idx:null};
+let orderTab = 'panel';
+let aiBusy = false;
+
+function allUsers() { return DB.get('users', {}); }
+function myData() { return me ? allUsers()[me] : null; }
+function ensureUser() {
+  if (!me) return;
+  const all = allUsers();
+  if (!all[me]) { all[me] = {saldo:0, panels:[], nokos:[], roles:[], limitDate:todayStr(), limits:{}}; DB.set('users', all); }
+}
+function saveMe(u) { const all = allUsers(); all[me] = u; DB.set('users', all); }
+
+/* ---------- Efek mengetik ---------- */
+const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let twToken = 0;
+function typeIn(...roots) {
+  const token = ++twToken;
+  if (REDUCE_MOTION) return;
+  const items = [];
+  roots.forEach(root => {
+    if (!root) return;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => {
+        const p = n.parentElement;
+        if (!p || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        if (p.closest('svg,script,style,option,.feed,.hide,.hid-file')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let n;
+    while ((n = w.nextNode())) items.push({node: n, text: n.nodeValue});
+  });
+  if (!items.length) return;
+  const total = items.reduce((s, i) => s + i.text.length, 0);
+  const delay = Math.max(10, Math.min(34, 1400 / total));
+  items.forEach(i => { i.node.nodeValue = ''; });
+  let idx = 0, pos = 0;
+  const step = () => {
+    if (token !== twToken) { items.forEach(i => { i.node.nodeValue = i.text; }); return; }
+    if (idx >= items.length) return;
+    const it = items[idx];
+    pos++;
+    it.node.nodeValue = it.text.slice(0, pos);
+    if (pos >= it.text.length) { idx++; pos = 0; setTimeout(step, delay * 4); }
+    else setTimeout(step, delay * (0.6 + Math.random() * 0.8));
+  };
+  step();
+}
+
+/* ---------- Toast ---------- */
+let tt;
+function toast(msg, err) {
+  const t = $('toast');
+  t.innerHTML = (err ? '' : ic('check')) + `<span>${esc(msg)}</span>`;
+  t.className = 'toast on' + (err ? ' err' : '');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2600);
+}
+
+/* ---------- Render ---------- */
+function renderHeader() {
+  const u = myData();
+  const bal = u ? u.saldo || 0 : 0;
+  $('uname').textContent = me ? (u?.displayName || me) : 'Belum login';
+  $('av').innerHTML = avHtml(u);
+  $('urole').textContent = me ? (u?.roles?.length ? u.roles[u.roles.length - 1].name : 'Member') : 'Login untuk mulai belanja';
+  $('balTxt').textContent = rp(bal);
+  $('heroAmt').textContent = rp(bal);
+}
+function renderStats() {
+  const u = myData() || {panels:[], nokos:[], roles:[]};
+  const v = [u.panels.length, u.nokos.length, u.roles.length];
+  const max = Math.max(...v, 1);
+  ['Panel', 'Nokos', 'Role'].forEach((k, i) => {
+    $('s' + k).textContent = v[i];
+    requestAnimationFrame(() => $('m' + k).style.width = (v[i] / max * 100) + '%');
+  });
+}
+function renderOrder() {
+  const t = orderTab;
+  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  $('orderDesc').textContent = TAB_DESC[t];
+  $('nokosNote').classList.toggle('hide', t !== 'nokos');
+  let html = '';
+  if (t === 'panel') {
+    html = '<div class="ram-grid">' + PANELS.map((p, i) => p.unli
+      ? `<button class="ram wide" onclick="openOrder('panel',${i})"><div><div class="big">UNLIMITED</div><div class="sub">RAM tanpa batas</div></div><div class="p">${rp(p.harga)}</div><span class="pill">BEST</span></button>`
+      : `<button class="ram" onclick="openOrder('panel',${i})"><div class="big">${p.ram.split(' ')[0]}<small>GB</small></div><div class="p">${rp(p.harga)}</div></button>`
+    ).join('') + '</div>';
+  } else if (t === 'nokos') {
+    html = NOKOS.map((n, i) => `
+      <button class="rich" onclick="openOrder('nokos',${i})">
+        <div class="tile light">${esc(n.name.charAt(0))}</div>
+        <div class="body"><div class="ttl">${esc(n.name)}</div><div class="sub">Kode OTP masuk otomatis</div></div>
+        <div class="price">${rp(n.harga)}</div>
+      </button>`).join('');
+  } else {
+    html = ROLES.map((r, i) => `
+      <div class="card">
+        <div class="row1">
+          <div class="nm"><span class="tile">${ic(r.icon)}</span><span>${esc(r.name)}</span></div>
+          <div class="price" style="font-family:'Bricolage Grotesque';font-weight:800">${rp(r.harga)}</div>
+        </div>
+        <div class="desc">${esc(r.desc)}</div>
+        <div class="role-foot">
+          <span class="badge">${ic('bolt').replace('class="ic"', 'class="ic" style="width:14px;height:14px;vertical-align:-2px"')} ${r.limit}x/hari</span>
+          <button class="b3 sm" onclick="openOrder('role',${i})">Beli role</button>
+        </div>
+      </div>`).join('');
+  }
+  $('orderBody').innerHTML = html;
+  paintIcons($('orderBody'));
+}
+function renderPanels() {
+  if (!me) {
+    $('limitBox').innerHTML = '';
+    $('panelList').innerHTML = `<div class="empty"><div class="tile" data-ic="lock"></div>Login dulu untuk melihat panel kamu.</div>`;
+    paintIcons($('panelList'));
+    return;
+  }
+  // Bersihkan panel expired otomatis
+  const u = myData();
+  if (u && u.panels && u.panels.length) {
+    const now = new Date();
+    const before = u.panels.length;
+    u.panels = u.panels.filter(p => new Date(p.expiresAt) > now);
+    if (u.panels.length !== before) saveMe(u);
+  }
+
+  // Render limit box
+  renderLimitBox();
+
+  // Render panel list
+  const list = (myData()?.panels) || [];
+  if (!list.length) {
+    $('panelList').innerHTML = `<div class="empty"><div class="tile" data-ic="server"></div>Belum ada panel.<br>Order dari menu Order, lalu pilih Panel.</div>`;
+    paintIcons($('panelList'));
+    return;
+  }
+  $('panelList').innerHTML = list.map(p => {
+    const left = Math.ceil((new Date(p.expiresAt) - new Date()) / 864e5);
+    const cls = left <= 0 ? 'dead' : left <= 5 ? 'warn' : '';
+    return `<div class="card">
+      <div class="row1"><div class="nm"><span class="tile">${ic('server')}</span><span>${esc(p.name)}</span></div><span class="badge ${cls}">${left > 0 ? left + ' hari lagi' : 'Expired'}</span></div>
+      <div class="kv">
+        <span>RAM</span><span>${esc(p.ram)}</span>
+        <span>Domain</span><span>${esc(p.domain)}</span>
+        <span>Username</span><span>${esc(p.panelUsername)}</span>
+        <span>Password</span><span>${esc(p.password)}</span>
+        <span>Dibuat</span><span>${new Date(p.createdAt).toLocaleDateString('id-ID')}</span>
+      </div></div>`;
+  }).join('');
+  paintIcons($('panelList'));
+}
+
+/* ---------- LIMIT HARIAN ROLE ---------- */
+function ensureLimitReset(u) {
+  if (!u) return null;
+  const today = todayStr();
+  if (u.limitDate !== today) {
+    u.limitDate = today;
+    u.limits = {};
+    saveMe(u);
+  }
+  return u;
+}
+function getLimitStatus() {
+  const u = ensureLimitReset(myData());
+  if (!u || !u.roles || !u.roles.length) return [];
+  return u.roles.map(r => {
+    const used = (u.limits && u.limits[r.name]) || 0;
+    return {name: r.name, limit: r.limit, used, sisa: Math.max(0, r.limit - used)};
+  });
+}
+function renderLimitBox() {
+  const status = getLimitStatus();
+  if (!status.length) { $('limitBox').innerHTML = ''; return; }
+  const total = status.reduce((s, x) => s + x.sisa, 0);
+  const badge = total > 0 ? `<span class="badge" style="background:var(--green);color:#fff;">${total} tersisa</span>` : `<span class="badge dead">Habis</span>`;
+  $('limitBox').innerHTML = `
+    <button class="rich" onclick="openLimitPanel()" style="margin-bottom:16px;">
+      <div class="tile light" data-ic="bolt"></div>
+      <div class="body"><div class="ttl">Panel gratis (role)</div><div class="sub">Klaim limit panel gratis dari role kamu</div></div>
+      ${badge}
+      <span class="chev" data-ic="chevron"></span>
+    </button>`;
+  paintIcons($('limitBox'));
+}
+function openLimitPanel() {
+  if (!requireLogin()) return;
+  const status = getLimitStatus();
+  if (!status.length) { toast('Kamu belum punya role. Beli dulu di menu Order → Role', true); return; }
+  $('limitList').innerHTML = status.map(s => {
+    const cls = s.sisa === 0 ? 'habis' : s.sisa === s.limit ? 'full' : '';
+    const btn = s.sisa > 0
+      ? `<button class="b3 sm" onclick="klaimLimit('${esc(s.name)}')">Buat panel</button>`
+      : `<span class="badge dead">Habis</span>`;
+    return `<div class="card" style="margin-bottom:10px;">
+      <div class="row1">
+        <div class="nm"><span class="tile">${ic('shield')}</span><span>${esc(s.name)}</span></div>
+        <span class="badge ${cls}">${s.sisa}/${s.limit}</span>
+      </div>
+      <div class="role-foot">
+        <span class="desc">Sisa ${s.sisa} dari ${s.limit} hari ini</span>
+        ${btn}
+      </div>
+    </div>`;
+  }).join('');
+  paintIcons($('limitList'));
+  open('mLimit');
+}
+function klaimLimit(roleName) {
+  const u = ensureLimitReset(myData());
+  if (!u) return;
+  const role = u.roles.find(r => r.name === roleName);
+  if (!role) { toast('Role tidak ditemukan', true); return; }
+  const used = (u.limits && u.limits[roleName]) || 0;
+  if (used >= role.limit) { toast('Limit ' + roleName + ' sudah habis hari ini', true); return; }
+
+  // Minta nama server
+  const name = prompt('Nama server untuk panel gratis:');
+  if (!name || name.trim().length < 3) { toast('Nama server minimal 3 karakter', true); return; }
+  const username = prompt('Username panel:', me + '_' + roleName.toLowerCase().slice(0, 6)) || (me + '_panel');
+  if (!username || username.length < 3) { toast('Username panel minimal 3 karakter', true); return; }
+
+  // Pakai limit + buat panel
+  if (!u.limits) u.limits = {};
+  u.limits[roleName] = used + 1;
+  const settings = DB.get('admin_settings', {});
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let pwd = ''; for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  const now = new Date();
+  u.panels.push({
+    id:'SRV-' + Date.now(), name:name.trim(), ram:'2 GB', harga:0,
+    domain: settings.panelDomain || settings.pteroUrl || 'https://panel.autopanel.com',
+    panelUsername: username, password: pwd,
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 30 * 864e5).toISOString(),
+    status:'active', gratis:true, roleAsal: roleName
+  });
+  saveMe(u);
+  close('mLimit');
+  renderPanels();
+  renderHeader();
+  renderStats();
+  toast('🎁 Panel gratis dibuat! Sisa limit ' + (role.limit - used - 1));
+}
+
+/* ---------- AI ---------- */
+function getAIHistory(){ return DB.get(AI_HISTORY_KEY(), []); }
+function saveAIHistory(arr){ DB.set(AI_HISTORY_KEY(), arr.slice(-40)); }
+
+function formatAI(t) {
+  if (!t) return '';
+  let s = String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  s = s.replace(/```([\s\S]*?)```/g, (_,c)=>`<pre>${c.trim()}</pre>`);
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\n/g, '<br>');
+  return s;
+}
+function appendAIBubble(role, text, opts = {}) {
+  const feed = $('aiFeed');
+  const div = document.createElement('div');
+  div.className = 'bubble ' + (role === 'user' ? 'me' : 'other');
+  const time = new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+  div.innerHTML = formatAI(text) + `<div class="t">${time}</div>`;
+  if (role === 'bot' && !opts.typing) {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.textContent = '📋 Copy';
+    btn.onclick = () => {
+      navigator.clipboard.writeText(text);
+      btn.textContent = '✅ Tersalin';
+      setTimeout(() => btn.textContent = '📋 Copy', 1200);
+    };
+    div.appendChild(btn);
+  }
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+  return div;
+}
+function showAITyping() {
+  const feed = $('aiFeed');
+  const div = document.createElement('div');
+  div.className = 'bubble other ai-typing';
+  div.id = 'aiTyping';
+  div.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+function hideAITyping() {
+  const t = $('aiTyping');
+  if (t) t.remove();
+}
+function extractReply(data) {
+  if (data == null) return '';
+  if (typeof data === 'string') return data;
+  if (data.choices && data.choices[0]?.message?.content) return data.choices[0].message.content;
+  if (data.choices && data.choices[0]?.text) return data.choices[0].text;
+  for (const k of ['reply','response','message','result','answer','text','output','data']) {
+    if (typeof data[k] === 'string') return data[k];
+    if (data[k] && typeof data[k] === 'object') {
+      const inner = extractReply(data[k]);
+      if (inner) return inner;
+    }
+  }
+  try { return JSON.stringify(data, null, 2); } catch { return String(data); }
+}
+async function callAI(prompt) {
+  const url = AI_ENDPOINT + '?text=' + encodeURIComponent(prompt);
+  const res = await fetch(url, {method:'GET', headers:{'Accept':'application/json, text/plain, */*'}});
+  const raw = await res.text();
+  if (!res.ok) {
+    let msg = raw;
+    try { const j = JSON.parse(raw); msg = j.message || j.error || j.msg || raw; } catch {}
+    throw new Error('HTTP ' + res.status + ' — ' + String(msg || 'Gagal').slice(0, 200));
+  }
+  try {
+    const j = JSON.parse(raw);
+    return extractReply(j) || raw;
+  } catch { return raw; }
+}
+async function sendAI() {
+  if (aiBusy) return;
+  if (!requireLogin()) return;
+  const input = $('aiIn');
+  const text = input.value.trim();
+  if (!text) return;
+
+  appendAIBubble('user', text);
+  input.value = '';
+  const hist = getAIHistory();
+  hist.push({role:'user', text, time:new Date().toISOString()});
+  saveAIHistory(hist);
+
+  aiBusy = true;
+  $('aiSendBtn').disabled = true;
+  input.disabled = true;
+  showAITyping();
+
+  try {
+    const reply = await callAI(text);
+    hideAITyping();
+    appendAIBubble('bot', reply);
+    const h2 = getAIHistory();
+    h2.push({role:'bot', text:reply, time:new Date().toISOString()});
+    saveAIHistory(h2);
+  } catch (err) {
+    hideAITyping();
+    appendAIBubble('bot', '⚠️ Gagal menghubungi AI: ' + err.message + '\n\nCoba lagi sebentar.');
+  } finally {
+    aiBusy = false;
+    $('aiSendBtn').disabled = false;
+    input.disabled = false;
+    input.focus();
+  }
+}
+function renderAIHistory() {
+  const feed = $('aiFeed');
+  feed.innerHTML = '';
+  const hist = getAIHistory();
+  if (!hist.length) {
+    appendAIBubble('bot', 'Halo! 👋 Aku AI assistant AutoPanel. Tanya apa saja soal panel, nokos, role, atau saldo.');
+    return;
+  }
+  hist.forEach(h => appendAIBubble(h.role === 'user' ? 'user' : 'bot', h.text));
+  feed.scrollTop = feed.scrollHeight;
+}
+function resetAI() {
+  if (!confirm('Hapus semua riwayat chat AI?')) return;
+  DB.set(AI_HISTORY_KEY(), []);
+  renderAIHistory();
+  toast('Chat AI direset');
+}
+
+/* ---------- Chat ---------- */
+function renderChat() {
+  const box = $('feed');
+  const msgs = DB.get('public_chat', []);
+  if (!msgs.length) { box.innerHTML = `<div class="empty"><div class="tile" data-ic="message"></div>Belum ada pesan.<br>Jadilah yang pertama menyapa.</div>`; paintIcons(box); return; }
+  box.innerHTML = msgs.map(m => {
+    let c;
+    if (m.type === 'text') c = esc(m.text);
+    else if (m.type === 'image') c = `<img src="${m.data}" alt="">`;
+    else if (m.type === 'video') c = `<video src="${m.data}" controls></video>`;
+    else c = `<a href="${m.data}" download="${esc(m.filename)}">${esc(m.filename)}</a>`;
+    return `<div class="bubble ${m.user === me ? 'me' : 'other'}">
+      <div class="who">${esc(m.user)}</div>${c}
+      <div class="t">${new Date(m.time).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}</div></div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- Navigation ---------- */
+function go(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  $('p-' + (page === 'order' ? 'order' : page)).classList.add('on');
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.n === page));
+  window.scrollTo({top:0, behavior:'smooth'});
+  if (page === 'home') { renderHeader(); renderStats(); }
+  if (page === 'saya') renderPanels();
+  if (page === 'chat') renderChat();
+  if (page === 'ai') renderAIHistory();
+  document.body.classList.toggle('fs', ['chat', 'ai', 'settings'].includes(page));
+  if (page === 'settings') renderSettings();
+  typeIn($('p-' + page));
+}
+function showTab(tab) {
+  orderTab = tab;
+  document.body.classList.remove('fs');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  $('p-order').classList.add('on');
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.n === 'order'));
+  window.scrollTo({top:0, behavior:'smooth'});
+  renderOrder();
+  typeIn($('p-order'));
+}
+$('seg').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b) { orderTab = b.dataset.t; renderOrder(); typeIn($('orderBody')); }
+});
+
+/* ---------- Sheets ---------- */
+function open(id) { $(id).classList.add('on'); typeIn($(id).querySelector('.sheet')); }
+function close(id) { $(id).classList.remove('on'); }
+function preview(e, imgId) {
+  const f = e.target.files[0];
+  const img = $(imgId);
+  if (!f) { img.classList.remove('on'); return; }
+  readFile(f).then(d => { img.src = d; img.classList.add('on'); });
+}
+function requireLogin() { if (!me) { toast('Login dulu ya', true); return false; } return true; }
+
+function openDeposit() {
+  if (!requireLogin()) return;
+  $('depAmt').value = '';
+  $('depPrev').classList.remove('on');
+  document.querySelector('#mDeposit input[type=file]').value = '';
+  open('mDeposit');
+}
+async function submitDeposit() {
+  const amount = parseInt($('depAmt').value);
+  if (!amount || amount < 1000) return toast('Nominal minimal Rp 1.000', true);
+  const f = document.querySelector('#mDeposit input[type=file]').files[0];
+  if (!f) return toast('Upload bukti transfer dulu', true);
+  const bukti = await readFile(f);
+  const reqs = DB.get('pending_topups', []);
+  reqs.push({id:'TOP-' + Date.now(), user:me, amount, bukti, status:'pending', createdAt:new Date().toISOString()});
+  DB.set('pending_topups', reqs);
+  close('mDeposit');
+  toast('Deposit terkirim ke admin');
+}
+
+function openOrder(type, idx) {
+  if (!requireLogin()) return;
+  order = {type, idx};
+  const u = myData();
+  const isPanel = type === 'panel';
+  let item, title, rows;
+  if (type === 'panel') { item = PANELS[idx]; title = 'Konfirmasi panel';
+    rows = [['RAM', item.ram], ['Harga', rp(item.harga)], ['Saldo', rp(u.saldo)]];
+  } else if (type === 'nokos') { item = NOKOS[idx]; title = 'Konfirmasi nokos';
+    rows = [['Layanan', item.name], ['Harga', rp(item.harga)], ['Saldo', rp(u.saldo)]];
+  } else { item = ROLES[idx]; title = 'Konfirmasi role';
+    rows = [['Role', item.name], ['Harga', rp(item.harga)], ['Limit', item.limit + 'x/hari'], ['Saldo', rp(u.saldo)]];
+  }
+  $('oTitle').textContent = title;
+  $('oSum').innerHTML = rows.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('');
+  $('oPanelFields').classList.toggle('hide', !isPanel);
+  $('oUser').value = isPanel ? me + '_panel' : '';
+  $('oServer').value = '';
+  $('oPay').value = 'saldo';
+  $('oQrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=QRIS-DEMO-' + type.toUpperCase();
+  $('oQrTot').textContent = 'Total: ' + rp(item.harga);
+  $('oPrev').classList.remove('on');
+  document.querySelector('#mOrder input[type=file]').value = '';
+  togglePay();
+  open('mOrder');
+}
+function togglePay() { $('oQris').classList.toggle('hide', $('oPay').value !== 'qris'); }
+
+async function submitOrder() {
+  const {type, idx} = order;
+  const item = type === 'panel' ? PANELS[idx] : type === 'nokos' ? NOKOS[idx] : ROLES[idx];
+  const price = item.harga;
+  const isPanel = type === 'panel';
+  const username = $('oUser').value.trim();
+  const server = $('oServer').value.trim();
+  if (isPanel && username.length < 3) return toast('Username panel minimal 3 karakter', true);
+  if (isPanel && server.length < 3) return toast('Nama server minimal 3 karakter', true);
+
+  const method = $('oPay').value;
+  const u = myData();
+
+  if (method === 'saldo') {
+    if (u.saldo < price) return toast('Saldo tidak cukup', true);
+    u.saldo -= price;
+    if (type === 'panel') createPanel(u, item, server, username);
+    if (type === 'nokos') u.nokos.push({id:'NK-' + Date.now(), name:item.name, harga:price, otp:'(menunggu API)', createdAt:new Date().toISOString()});
+    if (type === 'role') {
+      const existing = u.roles.find(r => r.name === item.name);
+      if (existing) { existing.boughtAt = new Date().toISOString(); existing.limit = item.limit; }
+      else { u.roles.push({id:'R-' + Date.now(), name:item.name, limit:item.limit, boughtAt:new Date().toISOString()}); }
+      if (u.limitDate !== todayStr()) { u.limitDate = todayStr(); u.limits = {}; }
+      u.limits[item.name] = 0;
+    }
+    saveMe(u);
+    close('mOrder'); renderHeader(); renderStats();
+    if (type === 'panel') { toast('Panel berhasil dibuat'); go('saya'); }
+    else if (type === 'nokos') toast('Nokos dibeli. OTP menunggu API');
+    else toast('Role ' + item.name + ' aktif. Limit ' + item.limit + 'x/hari');
+    return;
+  }
+
+  const f = document.querySelector('#mOrder input[type=file]').files[0];
+  if (!f) return toast('Upload bukti dulu', true);
+  const bukti = await readFile(f);
+  const orders = DB.get('pending_orders', []);
+  orders.push({id:'ORD-' + Date.now(), type, user:me, item:item.name || item.ram, ram:item.ram, role:item.name, service:item.name, harga:price, serverName:server, panelUsername:username, bukti, status:'pending', createdAt:new Date().toISOString()});
+  DB.set('pending_orders', orders);
+  close('mOrder');
+  toast('Order terkirim, tunggu approve admin');
+}
+
+function createPanel(u, p, serverName, panelUsername) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let pwd = ''; for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  const settings = DB.get('admin_settings', {});
+  const now = new Date();
+  u.panels.push({
+    id:'SRV-' + Date.now(), name:serverName, ram:p.ram, harga:p.harga,
+    domain: settings.panelDomain || settings.pteroUrl || 'https://panel.autopanel.com',
+    panelUsername, password:pwd, createdAt:now.toISOString(),
+    expiresAt:new Date(now.getTime() + 30 * 864e5).toISOString(), status:'active'
+  });
+}
+
+/* ---------- Chat ---------- */
+function sendChat() {
+  const el = $('chatIn');
+  const text = el.value.trim();
+  if (!text) return;
+  if (!requireLogin()) return;
+  const msgs = DB.get('public_chat', []);
+  msgs.push({user:me, type:'text', text, time:new Date().toISOString()});
+  DB.set('public_chat', msgs);
+  el.value = ''; renderChat();
+}
+async function sendFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  if (!requireLogin()) { e.target.value = ''; return; }
+  if (f.size > 2 * 1024 * 1024) { e.target.value = ''; return toast('File maksimal 2MB (demo)', true); }
+  const data = await readFile(f);
+  const type = f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : 'file';
+  const msgs = DB.get('public_chat', []);
+  msgs.push({user:me, type, data, filename:f.name, time:new Date().toISOString()});
+  DB.set('public_chat', msgs);
+  e.target.value = ''; renderChat();
+}
+
+/* ---------- Pengaturan akun ---------- */
+function avHtml(u) {
+  if (!me) return '?';
+  return u?.avatar ? `<img src="${u.avatar}" alt="">` : esc(me.charAt(0).toUpperCase());
+}
+function renderAll() { renderHeader(); renderStats(); renderOrder(); }
+function renderSettings() {
+  if (!me) { go('home'); toast('Login dulu ya', true); return; }
+  const u = myData();
+  $('setAv').innerHTML = avHtml(u);
+  $('setName').textContent = u.displayName || me;
+  $('setUser').textContent = '@' + me;
+}
+let setMode = null;
+const SET_CFG = {
+  name: {title:'Ubah nama', label:'Nama tampil', ph:'contoh: Budi Santoso'},
+  user: {title:'Ubah username', label:'Username baru', ph:'3-20 huruf, angka, atau _'}
+};
+function openSet(mode) {
+  if (!requireLogin()) return;
+  setMode = mode;
+  const c = SET_CFG[mode];
+  $('setTitle').textContent = c.title;
+  $('setLabel').textContent = c.label;
+  $('setInput').placeholder = c.ph;
+  $('setInput').value = mode === 'name' ? (myData().displayName || me) : me;
+  open('mSet');
+}
+function saveSet() {
+  const v = $('setInput').value.trim();
+  const all = allUsers();
+  if (setMode === 'name') {
+    if (v.length < 2 || v.length > 30) return toast('Nama harus 2-30 karakter', true);
+    all[me].displayName = v;
+    DB.set('users', all);
+  } else {
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(v)) return toast('Username 3-20 karakter: huruf, angka, atau _', true);
+    if (v === me) { close('mSet'); return; }
+    if (all[v]) return toast('Username sudah dipakai', true);
+    all[v] = all[me];
+    delete all[me];
+    DB.set('users', all);
+    const rename = (key, arr) => DB.set(key, DB.get(key, []).map(x => x.user === me ? {...x, user: v} : x));
+    rename('pending_orders'); rename('pending_topups'); rename('public_chat');
+    me = v;
+    DB.set('current_user', me);
+  }
+  close('mSet');
+  renderAll();
+  renderSettings();
+  toast('Perubahan disimpan');
+}
+async function changePhoto(e) {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f || !requireLogin()) return;
+  if (f.size > 2 * 1024 * 1024) return toast('Foto maksimal 2MB', true);
+  const data = await readFile(f);
+  const all = allUsers();
+  all[me].avatar = data;
+  DB.set('users', all);
+  renderAll();
+  renderSettings();
+  toast('Foto profil diperbarui');
+}
+async function hashPw(s) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function openPwd() {
+  if (!requireLogin()) return;
+  $('pw1').value = ''; $('pw2').value = '';
+  open('mPwd');
+}
+async function savePwd() {
+  const a = $('pw1').value, b = $('pw2').value;
+  if (a.length < 6) return toast('Password minimal 6 karakter', true);
+  if (a !== b) return toast('Konfirmasi password tidak sama', true);
+  const all = allUsers();
+  all[me].pwdHash = await hashPw(a);
+  DB.set('users', all);
+  close('mPwd');
+  toast('Password berhasil direset');
+}
+function logout() {
+  if (!me) return;
+  if (!confirm('Keluar dari akun ini?')) return;
+  me = null;
+  DB.set('current_user', null);
+  renderAll();
+  go('home');
+  toast('Kamu sudah keluar');
+}
+
+/* ---------- Init ---------- */
+paintIcons();
+ensureUser();
+renderHeader();
+renderStats();
+renderOrder();
+typeIn(document.querySelector('.top'), document.querySelector('.nav'), $('p-home'));
+</script>
+</body>
+</html>
