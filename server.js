@@ -13,18 +13,18 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const axios = require('axios');
 const { Client, GatewayIntentBits } = require('discord.js');
+const fs = require('fs');
 const config = require('./config');
 
 const app = express();
 
-// Vercel tidak mengizinkan penulisan file lokal, simpan upload di /tmp
+// Vercel tidak mengizinkan penulisan file lokal sembarangan, 
+// jadi simpan upload sementara di /tmp
 const upload = multer({ dest: '/tmp' }); 
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// NOTE: express.static DIHAPUS karena Vercel menangani folder /public via vercel.json
 
 // ==========================================
 // DATABASE SEMENTARA VERCEL (FILE JSON DI /tmp)
@@ -32,19 +32,19 @@ app.use(express.urlencoded({ extended: true }));
 const DB_PATH = '/tmp/database.json';
 
 function readDB() {
-  if (!require('fs').existsSync(DB_PATH)) {
+  if (!fs.existsSync(DB_PATH)) {
     const initial = {
       users: [{ id: 1, username: config.ADMIN.username, password: bcrypt.hashSync(config.ADMIN.password, 10), role: 'admin', saldo: 0 }],
       panels: [], nokos: [], user_roles: [], orders: []
     };
-    require('fs').writeFileSync(DB_PATH, JSON.stringify(initial));
+    fs.writeFileSync(DB_PATH, JSON.stringify(initial));
     return initial;
   }
-  return JSON.parse(require('fs').readFileSync(DB_PATH, 'utf8'));
+  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
 }
 
 function writeDB(data) {
-  require('fs').writeFileSync(DB_PATH, JSON.stringify(data));
+  fs.writeFileSync(DB_PATH, JSON.stringify(data));
 }
 
 // ==========================================
@@ -81,14 +81,14 @@ const adminAuth = (req, res, next) => {
 };
 
 // ==========================================
-// INTEGRASI API NYATA
+// INTEGRASI API NYATA (Pterodactyl & Discord)
 // ==========================================
 
 async function createPterodactylServer(serverName, panelUsername, memoryMb) {
   try {
     const headers = { 'Authorization': `Bearer ${config.PTERODACTYL.API_KEY}`, 'Accept': 'application/json' };
     
-    // Cek apakah user sudah ada, kalau belum buat baru
+    // 1. Cek/Buat User Pterodactyl
     let ownerId;
     try {
       const userSearch = await axios.get(`${config.PTERODACTYL.URL}/api/application/users?filter[email]=${panelUsername}@user.local`, { headers });
@@ -106,7 +106,7 @@ async function createPterodactylServer(serverName, panelUsername, memoryMb) {
       ownerId = newUser.data.attributes.id;
     }
 
-    // Buat Server
+    // 2. Buat Server
     const serverRes = await axios.post(`${config.PTERODACTYL.URL}/api/application/servers`, {
       name: serverName,
       user: ownerId,
@@ -147,6 +147,23 @@ async function giveDiscordRole(discordId, roleName) {
 // ROUTES API
 // ==========================================
 
+// --- AUTH ---
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || username.length < 3) return res.status(400).json({ success: false, message: 'Username minimal 3 karakter' });
+    const db = readDB();
+    if (db.users.find(u => u.username === username)) return res.status(400).json({ success: false, message: 'Username sudah dipakai' });
+
+    const hash = bcrypt.hashSync(password, 10);
+    const newUser = { id: Date.now(), username, password: hash, role: 'user', saldo: 0 };
+    db.users.push(newUser);
+    writeDB(db);
+
+    res.json({ success: true, message: 'Registrasi berhasil, silakan login' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 app.post('/api/auth/login', (req, res) => {
   try {
     const { username, password } = req.body;
@@ -161,27 +178,50 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
+// --- TOPUP (Manual DANA) ---
+app.post('/api/topup', auth, upload.single('bukti'), async (req, res) => {
+  try {
+    const amount = parseInt(req.body.amount);
+    if (!amount || amount < 1000) return res.status(400).json({ success: false, message: 'Minimal Rp 1.000' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'Upload bukti transfer dulu' });
+
+    const db = readDB();
+    const orderId = `TOP-${Date.now()}`;
+    
+    // Simpan ke pending topups
+    if(!db.topups) db.topups = [];
+    db.topups.push({ id: orderId, user_id: req.user.id, amount, status: 'pending', date: new Date().toISOString() });
+    writeDB(db);
+
+    res.json({ success: true, message: 'Topup terkirim, tunggu ACC admin' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+// --- ORDER (Panel / Nokos / Role) ---
 app.post('/api/order', auth, upload.single('bukti'), async (req, res) => {
   try {
     const { type, item, detail, pay_method } = req.body;
     const parsedDetail = detail ? JSON.parse(detail) : {};
     const db = readDB();
+    
+    // Cari harga
     let harga = 0;
+    if (type === 'panel') harga = config.PANEL_PRICES.find(x => x.ram === item)?.harga || 0;
+    if (type === 'role') harga = config.ROLE_LIST.find(x => x.name === item)?.harga || 0;
 
-    if (type === 'panel') harga = config.PANEL_PRICES.find(x => x.ram === item).harga;
-    if (type === 'role') harga = config.ROLE_LIST.find(x => x.name === item).harga;
+    const user = db.users.find(u => u.id === req.user.id);
 
     // --- BAYAR PAKAI SALDO ---
     if (pay_method === 'saldo') {
-      const user = db.users.find(u => u.id === req.user.id);
       if (user.saldo < harga) return res.status(400).json({ success: false, message: 'Saldo tidak cukup' });
 
       try {
         if (type === 'panel') {
           const p = config.PANEL_PRICES.find(x => x.ram === item);
           const pteroId = await createPterodactylServer(parsedDetail.serverName, parsedDetail.panelUsername, p.mb);
-          db.panels.push({ user_id: user.id, ptero_id: pteroId, name: parsedDetail.serverName, ram: item });
-        } else if (type === 'role') {
+          db.panels.push({ user_id: user.id, ptero_id: pteroId, name: parsedDetail.serverName, ram: item, domain: config.PTERODACTYL.URL });
+        } 
+        else if (type === 'role') {
           if (!parsedDetail.discordId) return res.status(400).json({ success: false, message: 'Masukkan ID Discord!' });
           await giveDiscordRole(parsedDetail.discordId, item);
           db.user_roles.push({ user_id: user.id, name: item });
@@ -195,9 +235,11 @@ app.post('/api/order', auth, upload.single('bukti'), async (req, res) => {
       }
     }
 
-    // --- QRIS MANUAL ---
-    const code = `ORD-${Date.now()}`;
-    db.orders.push({ id: code, user_id: req.user.id, type, item, detail: detail || '{}', harga, status: 'pending' });
+    // --- QRIS MANUAL (TUNGGU ACC) ---
+    if (!req.file) return res.status(400).json({ success: false, message: 'Upload bukti transfer dulu' });
+    
+    const orderId = `ORD-${Date.now()}`;
+    db.orders.push({ id: orderId, user_id: user.id, type, item, detail, harga, status: 'pending' });
     writeDB(db);
     res.json({ success: true, message: 'Order terkirim, tunggu ACC admin' });
 
@@ -206,7 +248,8 @@ app.post('/api/order', auth, upload.single('bukti'), async (req, res) => {
   }
 });
 
-app.post('/api/admin/approve/:id', auth, adminAuth, async (req, res) => {
+// --- ADMIN ACC ---
+app.post('/api/admin/approve-order/:id', auth, adminAuth, async (req, res) => {
   try {
     const db = readDB();
     const order = db.orders.find(o => o.id === req.params.id);
@@ -217,7 +260,7 @@ app.post('/api/admin/approve/:id', auth, adminAuth, async (req, res) => {
     if (order.type === 'panel') {
       const p = config.PANEL_PRICES.find(x => x.ram === order.item);
       const pteroId = await createPterodactylServer(detail.serverName, detail.panelUsername, p.mb);
-      db.panels.push({ user_id: order.user_id, ptero_id: pteroId, name: detail.serverName, ram: order.item });
+      db.panels.push({ user_id: order.user_id, ptero_id: pteroId, name: detail.serverName, ram: order.item, domain: config.PTERODACTYL.URL });
     } else if (order.type === 'role') {
       if (detail.discordId) await giveDiscordRole(detail.discordId, order.item);
       db.user_roles.push({ user_id: order.user_id, name: order.item });
@@ -231,17 +274,19 @@ app.post('/api/admin/approve/:id', auth, adminAuth, async (req, res) => {
   }
 });
 
+// --- AI PROXY ---
 app.post('/api/ai', auth, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.status(400).json({ success: false, message: 'Text kosong' });
-    const response = await axios.get(`${config.AI.ENDPOINT}?text=${encodeURIComponent(text)}`, { timeout: config.AI.TIMEOUT });
+    const response = await axios.get(`${config.AI.ENDPOINT}?text=${encodeURIComponent(text)}`, { timeout: 30000 });
     res.json({ success: true, reply: response.data });
   } catch (e) { 
     res.status(500).json({ success: false, message: 'AI sibuk / error' }); 
   }
 });
 
+// --- HEALTH CHECK ---
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // ==========================================
