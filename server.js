@@ -1,320 +1,211 @@
 'use strict';
 
-// ==========================================
-// ANTI-CRASH: Menangkap error agar server tidak mati
-// ==========================================
-process.on('uncaughtException', (err) => {
-  console.error('[UNCAUGHT EXCEPTION]', err.message);
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('[UNHANDLED REJECTION]', reason);
-});
+process.on('uncaughtException', (err) => console.error('[UNCAUGHT]', err.message));
+process.on('unhandledRejection', (reason) => console.error('[UNHANDLED]', reason));
 
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const axios = require('axios');
 const { Client, GatewayIntentBits } = require('discord.js');
 const config = require('./config');
-const db = require('./db'); // Pastikan file db.js sudah ada dan pakai better-sqlite3
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+
+// Vercel tidak bisa simpan file di public, jadi simpan upload di /tmp
+const upload = multer({ dest: '/tmp' }); 
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Sajikan file statis dari folder public (berkat vercel.json)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ==========================================
+// DATABASE SEMENTARA VERCEL (FILE JSON)
+// ==========================================
+const DB_PATH = '/tmp/database.json';
+
+function readDB() {
+  if (!fs.existsSync(DB_PATH)) {
+    const initial = {
+      users: [{ id: 1, username: config.ADMIN.username, password: bcrypt.hashSync(config.ADMIN.password, 10), role: 'admin', saldo: 0 }],
+      panels: [], nokos: [], user_roles: [], orders: []
+    };
+    fs.writeFileSync(DB_PATH, JSON.stringify(initial));
+    return initial;
+  }
+  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+}
+
+function writeDB(data) {
+  fs.writeFileSync(DB_PATH, JSON.stringify(data));
+}
 
 // ==========================================
 // DISCORD BOT SETUP
 // ==========================================
 let discordClient = null;
-if (config.DISCORD && config.DISCORD.BOT_TOKEN !== 'MTExMjM0NTY3ODkw...') {
+if (config.DISCORD && config.DISCORD.BOT_TOKEN !== 'token_bot_discord_kamu') {
   discordClient = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
-  discordClient.login(config.DISCORD.BOT_TOKEN).then(() => {
-    console.log('[DISCORD] Bot berhasil login sebagai', discordClient.user.tag);
-  }).catch(err => console.error('[DISCORD ERROR]', err.message));
+  discordClient.login(config.DISCORD.BOT_TOKEN).catch(err => console.error('[DISCORD ERROR]', err.message));
 }
-
-// ==========================================
-// MIDDLEWARES
-// ==========================================
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(config.PAYMENT.UPLOAD_DIR));
-app.use(express.static(path.join(__dirname, 'public')));
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, config.PAYMENT.UPLOAD_DIR),
-  filename: (req, file, cb) => cb(null, `bukti_${Date.now()}${path.extname(file.originalname)}`)
-});
-const upload = multer({ storage, limits: { fileSize: config.PAYMENT.MAX_UPLOAD } });
 
 // ==========================================
 // HELPERS & AUTH
 // ==========================================
-const signToken = (user) => jwt.sign({ id: user.id, username: user.username, role: user.role }, config.JWT_SECRET, { expiresIn: '7d' });
+const signToken = (user) => jwt.sign({ id: user.id, role: user.role }, config.JWT_SECRET, { expiresIn: '7d' });
 
 const auth = (req, res, next) => {
   const token = (req.headers.authorization || '').replace('Bearer ', '');
-  if (!token) return res.status(401).json({ success: false, message: 'Token tidak ada' });
+  if (!token) return res.status(401).json({ message: 'No token' });
   try {
     const payload = jwt.verify(token, config.JWT_SECRET);
-    req.user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
-    if (!req.user) return res.status(401).json({ success: false, message: 'User tidak ditemukan' });
-    if (req.user.banned) return res.status(403).json({ success: false, message: 'Akun diblokir' });
+    const db = readDB();
+    req.user = db.users.find(u => u.id === payload.id);
+    if (!req.user) return res.status(401).json({ message: 'User not found' });
     next();
-  } catch (e) {
-    res.status(401).json({ success: false, message: 'Token tidak valid' });
-  }
+  } catch (e) { res.status(401).json({ message: 'Invalid token' }); }
 };
 
-const adminAuth = (req, res, next) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Akses ditolak' });
-  next();
-};
-
-// Seed Admin
-(function seed() {
-  try {
-    const exist = db.prepare('SELECT id FROM users WHERE username = ?').get(config.ADMIN.username);
-    if (!exist) {
-      const hash = bcrypt.hashSync(config.ADMIN.password, 10);
-      db.prepare(`INSERT INTO users (username, password, display_name, role) VALUES (?, ?, 'Admin', 'admin')`).run(config.ADMIN.username, hash);
-      console.log('[SEED] Admin dibuat');
-    }
-  } catch (e) { console.error('[SEED ERROR]', e.message); }
-})();
-
 // ==========================================
-// INTEGRASI EKSTERNAL (NYATA)
+// EKSEKUSI API NYATA
 // ==========================================
 
-// 1. Buat Server Pterodactyl
 async function createPterodactylServer(serverName, panelUsername, memoryMb) {
-  try {
-    const headers = { 'Authorization': `Bearer ${config.PTERODACTYL.API_KEY}`, 'Accept': 'application/json' };
-    
-    // Cek user atau buat baru di Pterodactyl
-    let ownerId;
-    const userSearch = await axios.get(`${config.PTERODACTYL.URL}/api/application/users?filter[email]=${panelUsername}@user.local`, { headers }).catch(() => null);
-    
-    if (userSearch && userSearch.data.data.length > 0) {
-      ownerId = userSearch.data.data[0].attributes.id;
-    } else {
-      const newUser = await axios.post(`${config.PTERODACTYL.URL}/api/application/users`, {
-        email: `${panelUsername}@user.local`,
-        username: panelUsername,
-        first_name: serverName,
-        last_name: 'User',
-        password: Math.random().toString(36).slice(-10)
-      }, { headers });
-      ownerId = newUser.data.attributes.id;
+  const headers = { 'Authorization': `Bearer ${config.PTERODACTYL.API_KEY}`, 'Accept': 'application/json' };
+  
+  // 1. Buat User Pterodactyl
+  const userRes = await axios.post(`${config.PTERODACTYL.URL}/api/application/users`, {
+    email: `${panelUsername}@user.local`, username: panelUsername,
+    first_name: serverName, last_name: 'User', password: Math.random().toString(36).slice(-10)
+  }, { headers }).catch(async (err) => {
+    if (err.response && err.response.status === 422) {
+      const search = await axios.get(`${config.PTERODACTYL.URL}/api/application/users?filter[email]=${panelUsername}@user.local`, { headers });
+      return search.data.data[0].attributes ? { data: { attributes: search.data.data[0].attributes } } : null;
     }
+    throw err;
+  });
 
-    // Buat server
-    const serverRes = await axios.post(`${config.PTERODACTYL.URL}/api/application/servers`, {
-      name: serverName,
-      user: ownerId,
-      egg: config.PTERODACTYL.EGG_ID,
-      docker_image: config.PTERODACTYL.DOCKER_IMAGE,
-      startup: config.PTERODACTYL.STARTUP,
-      environment: { SERVER_JARFILE: 'server.jar', VANILLA_VERSION: 'latest' },
-      limits: { memory: memoryMb, swap: 0, disk: memoryMb * 2, io: 500, cpu: 100 },
-      allocation: { default: config.PTERODACTYL.DEFAULT_ALLOCATION }
-    }, { headers });
+  const ownerId = userRes.data.attributes.id;
 
-    return serverRes.data.attributes.id;
-  } catch (err) {
-    console.error('[PTERO ERROR]', err.response?.data || err.message);
-    throw new Error('Gagal ke Pterodactyl: ' + (err.response?.data?.errors?.[0]?.detail || err.message));
-  }
+  // 2. Buat Server
+  const serverRes = await axios.post(`${config.PTERODACTYL.URL}/api/application/servers`, {
+    name: serverName, user: ownerId, egg: config.PTERODACTYL.EGG_ID,
+    docker_image: config.PTERODACTYL.DOCKER_IMAGE, startup: config.PTERODACTYL.STARTUP,
+    environment: { SERVER_JARFILE: 'server.jar', VANILLA_VERSION: 'latest' },
+    limits: { memory: memoryMb, swap: 0, disk: memoryMb * 2, io: 500, cpu: 100 },
+    allocation: { default: config.PTERODACTYL.DEFAULT_ALLOCATION }
+  }, { headers });
+
+  return serverRes.data.attributes.id;
 }
 
-// 2. Beli Nomor SMS
-async function buySmsNumber(serviceCode) {
-  try {
-    // NOTE: Sesuaikan endpoint dengan dokumentasi provider SMS kamu
-    const res = await axios.post(`${config.SMS.BASE_URL}/request`, {
-      service: serviceCode, country: 'id'
-    }, { headers: { 'Authorization': `Bearer ${config.SMS.API_KEY}` } });
-    return { phone: res.data.phone, activationId: res.data.id };
-  } catch (err) {
-    console.error('[SMS ERROR]', err.response?.data || err.message);
-    throw new Error('Gagal beli SMS: ' + (err.response?.data?.message || err.message));
-  }
-}
-
-// 3. Beri Role Discord
 async function giveDiscordRole(discordId, roleName) {
-  if (!discordClient) throw new Error('Bot Discord belum siap');
-  try {
-    const guild = await discordClient.guilds.fetch(config.DISCORD.GUILD_ID);
-    const member = await guild.members.fetch(discordId);
-    const roleConfig = config.ROLE_LIST.find(r => r.name === roleName);
-    if (!roleConfig) throw new Error('Role tidak ada di config');
-    
-    const role = guild.roles.cache.get(roleConfig.discordRoleId);
-    if (!role) throw new Error('Role tidak ditemukan di server Discord');
-    
-    await member.roles.add(role);
-    return true;
-  } catch (err) {
-    console.error('[DISCORD ERROR]', err.message);
-    throw new Error('Gagal beri role Discord: ' + err.message);
-  }
+  if (!discordClient) throw new Error('Discord bot belum siap');
+  const guild = await discordClient.guilds.fetch(config.DISCORD.GUILD_ID);
+  const member = await guild.members.fetch(discordId);
+  const roleConfig = config.ROLE_LIST.find(r => r.name === roleName);
+  const role = guild.roles.cache.get(roleConfig.discordRoleId);
+  if (!role) throw new Error('Role tidak ditemukan di Discord');
+  await member.roles.add(role);
 }
 
 // ==========================================
-// ROUTES API (ORDER, TOPUP, DLL)
+// ROUTES API
 // ==========================================
 
 app.post('/api/auth/login', (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-    if (!user) return res.status(400).json({ success: false, message: 'User tidak ditemukan' });
-    if (user.banned) return res.status(403).json({ success: false, message: 'Akun diblokir' });
-    if (!bcrypt.compareSync(password, user.password)) return res.status(400).json({ success: false, message: 'Password salah' });
-    res.json({ success: true, token: signToken(user), user: { id: user.id, username: user.username, saldo: user.saldo, role: user.role } });
-  } catch (e) { res.status(500).json({ success: false, message: 'Server error' }); }
+  const { username, password } = req.body;
+  const db = readDB();
+  const user = db.users.find(u => u.username === username);
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.status(400).json({ success: false, message: 'Login gagal' });
+  }
+  res.json({ success: true, token: signToken(user), user: { id: user.id, username: user.username, saldo: user.saldo, role: user.role } });
 });
 
 app.post('/api/order', auth, upload.single('bukti'), async (req, res) => {
   try {
     const { type, item, detail, pay_method } = req.body;
     const parsedDetail = detail ? JSON.parse(detail) : {};
+    const db = readDB();
     let harga = 0;
 
-    if (type === 'panel') {
-      const p = config.PANEL_PRICES.find(x => x.ram === item);
-      if (!p) return res.status(400).json({ message: 'Paket panel tidak valid' });
-      harga = p.harga;
-    } else if (type === 'nokos') {
-      const n = config.NOKOS_LIST.find(x => x.name === item);
-      if (!n) return res.status(400).json({ message: 'Nokos tidak valid' });
-      harga = n.harga;
-    } else if (type === 'role') {
-      const r = config.ROLE_LIST.find(x => x.name === item);
-      if (!r) return res.status(400).json({ message: 'Role tidak valid' });
-      harga = r.harga;
-    }
+    if (type === 'panel') harga = config.PANEL_PRICES.find(x => x.ram === item).harga;
+    if (type === 'role') harga = config.ROLE_LIST.find(x => x.name === item).harga;
 
-    // --- BAYAR PAKAI SALDO (EKSEKUSI NYATA) ---
+    // --- BAYAR SALDO ---
     if (pay_method === 'saldo') {
-      if (req.user.saldo < harga) return res.status(400).json({ message: 'Saldo tidak cukup' });
+      const user = db.users.find(u => u.id === req.user.id);
+      if (user.saldo < harga) return res.status(400).json({ message: 'Saldo tidak cukup' });
 
-      // Eksekusi berdasarkan tipe (Bisa gagal di tengah jalan, jadi kita tangkap errornya)
-      try {
-        if (type === 'panel') {
-          const p = config.PANEL_PRICES.find(x => x.ram === item);
-          const pteroId = await createPterodactylServer(parsedDetail.serverName, parsedDetail.panelUsername, p.mb);
-          db.prepare(`INSERT INTO panels (user_id, ptero_id, name, ram, harga, panel_username, expires_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+30 days'))`)
-            .run(req.user.id, pteroId, parsedDetail.serverName, item, harga, parsedDetail.panelUsername);
-        } else if (type === 'nokos') {
-          const n = config.NOKOS_LIST.find(x => x.name === item);
-          const sms = await buySmsNumber(n.serviceCode);
-          db.prepare(`INSERT INTO nokos (user_id, name, harga, phone, status) VALUES (?, ?, ?, ?, 'pending')`)
-            .run(req.user.id, item, harga, sms.phone);
-        } else if (type === 'role') {
-          if (!parsedDetail.discordId) return res.status(400).json({ message: 'Masukkan ID Discord kamu!' });
-          await giveDiscordRole(parsedDetail.discordId, item);
-          const r = config.ROLE_LIST.find(x => x.name === item);
-          db.prepare(`INSERT INTO user_roles (user_id, name, limit_count, used_today) VALUES (?, ?, ?, 0) ON CONFLICT(user_id, name) DO UPDATE SET limit_count = excluded.limit_count, used_today = 0`)
-            .run(req.user.id, item, r.limit);
-        }
-
-        // Jika semua API berhasil, baru potong saldo
-        db.prepare('UPDATE users SET saldo = saldo - ? WHERE id = ?').run(harga, req.user.id);
-        return res.json({ success: true, message: 'Order berhasil dieksekusi secara nyata!' });
-
-      } catch (execError) {
-        // Jika Pterodactyl / SMS / Discord error, saldo TIDAK dipotong
-        return res.status(500).json({ message: execError.message });
+      if (type === 'panel') {
+        const p = config.PANEL_PRICES.find(x => x.ram === item);
+        const pteroId = await createPterodactylServer(parsedDetail.serverName, parsedDetail.panelUsername, p.mb);
+        db.panels.push({ user_id: user.id, ptero_id: pteroId, name: parsedDetail.serverName, ram: item });
+      } 
+      else if (type === 'role') {
+        await giveDiscordRole(parsedDetail.discordId, item);
+        db.user_roles.push({ user_id: user.id, name: item });
       }
+
+      user.saldo -= harga;
+      writeDB(db);
+      return res.json({ success: true, message: 'Order berhasil dieksekusi!' });
     }
 
-    // --- QRIS MANUAL (TUNGGU ACC ADMIN) ---
-    if (!req.file) return res.status(400).json({ message: 'Upload bukti transfer dulu' });
+    // --- QRIS MANUAL (TUNGGU ACC) ---
     const code = `ORD-${Date.now()}`;
-    db.prepare(`INSERT INTO orders (order_code, user_id, type, item, detail, harga, bukti) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(code, req.user.id, type, item, detail || '{}', harga, '/uploads/' + req.file.filename);
+    db.orders.push({ id: code, user_id: req.user.id, type, item, detail, harga, status: 'pending' });
+    writeDB(db);
     res.json({ success: true, message: 'Order terkirim, tunggu ACC admin' });
 
   } catch (err) {
-    console.error(err);
     res.status(500).json({ message: err.message });
   }
 });
 
-// ACC ADMIN (Eksekusi Nyata)
-app.post('/api/admin/approve-order/:id', auth, adminAuth, async (req, res) => {
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
-  if (!order || order.status !== 'pending') return res.status(400).json({ message: 'Order tidak valid' });
-
+// ADMIN ACC
+app.post('/api/admin/approve/:id', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Akses admin' });
   try {
+    const db = readDB();
+    const order = db.orders.find(o => o.id === req.params.id);
+    if (!order || order.status !== 'pending') return res.status(400).json({ message: 'Order tidak valid' });
     const detail = JSON.parse(order.detail || '{}');
+
     if (order.type === 'panel') {
       const p = config.PANEL_PRICES.find(x => x.ram === order.item);
       const pteroId = await createPterodactylServer(detail.serverName, detail.panelUsername, p.mb);
-      db.prepare(`INSERT INTO panels (user_id, ptero_id, name, ram, harga, panel_username, expires_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+30 days'))`)
-        .run(order.user_id, pteroId, detail.serverName, order.item, order.harga, detail.panelUsername);
-    } else if (order.type === 'nokos') {
-      const n = config.NOKOS_LIST.find(x => x.name === order.item);
-      const sms = await buySmsNumber(n.serviceCode);
-      db.prepare(`INSERT INTO nokos (user_id, name, harga, phone, status) VALUES (?, ?, ?, ?, 'pending')`).run(order.user_id, order.item, order.harga, sms.phone);
+      db.panels.push({ user_id: order.user_id, ptero_id: pteroId, name: detail.serverName, ram: order.item });
     } else if (order.type === 'role') {
-      if (detail.discordId) await giveDiscordRole(detail.discordId, order.item);
-      const r = config.ROLE_LIST.find(x => x.name === order.item);
-      db.prepare(`INSERT INTO user_roles (user_id, name, limit_count, used_today) VALUES (?, ?, ?, 0) ON CONFLICT(user_id, name) DO UPDATE SET limit_count = excluded.limit_count, used_today = 0`).run(order.user_id, order.item, r.limit);
+      await giveDiscordRole(detail.discordId, order.item);
+      db.user_roles.push({ user_id: order.user_id, name: order.item });
     }
 
-    db.prepare(`UPDATE orders SET status='approved' WHERE id=?`).run(order.id);
-    res.json({ success: true, message: 'Order ACC dan dieksekusi!' });
+    order.status = 'approved';
+    writeDB(db);
+    res.json({ success: true, message: 'ACC Berhasil dan dieksekusi!' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Gagal eksekusi: ' + err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 
-// AI Proxy
 app.post('/api/ai', auth, async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!text) return res.status(400).json({ message: 'Text kosong' });
-    const response = await axios.get(`${config.AI.ENDPOINT}?text=${encodeURIComponent(text)}`, { timeout: config.AI.TIMEOUT });
+    const response = await axios.get(`${config.AI.ENDPOINT}?text=${encodeURIComponent(req.body.text)}`);
     res.json({ reply: response.data });
-  } catch (e) { res.status(500).json({ message: 'AI sibuk / error' }); }
+  } catch (e) { res.status(500).json({ message: 'AI error' }); }
 });
 
-// Healthcheck
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// SPA Fallback
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'app.html')));
-
-// Error Handler Anti-Crash
-app.use((err, req, res, next) => {
-  console.error('[ERROR MIDDLEWARE]', err.message);
-  res.status(500).json({ success: false, message: err.message || 'Server Error' });
-});
-
-// ==========================================
-// START SERVER
-// ==========================================
-const PORT = config.PORT;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`===========================================`);
-  console.log(`  AutoPanel Backend NYATA berjalan`);
-  console.log(`  Port: ${PORT}`);
-  console.log(`===========================================`);
-});
-
-// Graceful Shutdown
-process.on('SIGTERM', () => {
-  console.log('Menutup server...');
-  server.close(() => process.exit(0));
-});
+// KARENA VERCEL, KITA TIDAK PAKAI app.listen()
+// Cukup export app-nya
+module.exports = app;
