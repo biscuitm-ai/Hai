@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F3C23E">
+<title>Masuk — AutoPanel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#F3C23E;--gold-2:#E2A91C;--gold-deep:#B9860C;
+  --ink:#1A1404;--ink-2:#4A3B12;--muted:#7D6A2E;
+  --card:#FFFDF7;--white:#FFFFFF;--edge:#E4D3A0;--red:#D64545;--green:#1E9E6A;
+  --r-xl:28px;--r-md:16px;--r-sm:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Figtree',system-ui,sans-serif;color:var(--ink);min-height:100vh;min-height:100dvh;
+  display:flex;align-items:center;justify-content:center;padding:24px 16px;overflow-x:hidden;
+  background:radial-gradient(120% 70% at 50% -10%,#FFE38A 0%,transparent 60%),linear-gradient(180deg,#F7CF55 0%,var(--gold) 45%,var(--gold-2) 100%);
+  background-attachment:fixed;-webkit-font-smoothing:antialiased;
+}
+h1,.display{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.02em;line-height:1.1}
+button,input{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:12px}
+.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.hide{display:none!important}
+
+.stage{width:100%;max-width:420px;display:flex;flex-direction:column;gap:22px}
+
+/* Brand */
+.brand{display:flex;align-items:center;gap:14px;padding:0 4px}
+.mark{width:58px;height:58px;border-radius:19px;background:var(--ink);color:var(--gold);display:grid;place-items:center;box-shadow:0 6px 0 #0a0800,0 12px 20px rgba(60,40,0,.25);flex-shrink:0}
+.mark .ic{width:28px;height:28px;fill:var(--gold);stroke:none}
+.brand h1{font-size:2rem}
+.brand p{color:var(--ink-2);font-weight:700;font-size:.92rem;margin-top:4px}
+
+/* Card */
+.card{background:var(--card);border-radius:var(--r-xl);padding:22px;box-shadow:0 8px 0 var(--edge),0 22px 40px rgba(90,60,0,.22);animation:rise .5s cubic-bezier(.2,.7,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* Tabs */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#F1E6BF;border-radius:var(--r-md);padding:6px;margin-bottom:20px}
+.tabs button{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;font-weight:800;font-size:.95rem;color:var(--ink-2);transition:transform .12s,box-shadow .12s,background .2s}
+.tabs button .ic{width:18px;height:18px}
+.tabs button.on{background:var(--white);color:var(--ink);box-shadow:0 4px 0 var(--edge),0 8px 14px rgba(90,60,0,.16);transform:translateY(-1px)}
+
+/* Error */
+.err{display:flex;align-items:center;gap:10px;background:var(--ink);color:#FFE7A3;padding:12px 14px;border-radius:var(--r-sm);font-size:.85rem;font-weight:700;margin-bottom:16px;animation:shake .35s}
+.err .ic{color:#FF8A8A;width:20px;height:20px}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+/* Fields */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:.82rem;font-weight:800;color:var(--ink-2);margin-bottom:8px;padding-left:2px}
+.inp{display:flex;align-items:center;gap:10px;background:var(--white);border-radius:var(--r-md);padding:0 14px;box-shadow:inset 0 3px 0 #EFE2B4;transition:box-shadow .2s}
+.inp > .ic{color:var(--gold-deep)}
+.inp:focus-within{box-shadow:inset 0 0 0 3px var(--ink)}
+.inp input{flex:1;min-width:0;border:0;outline:none;background:transparent;padding:16px 0;font-weight:700;font-size:1rem}
+.inp input::placeholder{color:#A8954F;font-weight:600}
+.eye{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--ink-2);flex-shrink:0}
+.eye:hover{background:#F6EDD0}
+.field small{display:block;font-size:.75rem;color:var(--muted);font-weight:700;margin-top:7px;padding-left:2px}
+
+/* 3D white button */
+.b3{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:17px 20px;border-radius:var(--r-md);background:var(--white);color:var(--ink);font-weight:800;font-size:1.02rem;box-shadow:0 6px 0 var(--edge),0 12px 22px rgba(90,60,0,.22);transition:transform .12s,box-shadow .12s;margin-top:6px}
+.b3:hover{transform:translateY(-1px)}
+.b3:active{transform:translateY(5px);box-shadow:0 1px 0 var(--edge),0 4px 8px rgba(90,60,0,.18)}
+.b3 .ic{width:20px;height:20px}
+.b3[disabled]{opacity:.6;pointer-events:none}
+
+.foot{text-align:center;margin-top:20px;font-size:.9rem;font-weight:700;color:var(--ink-2)}
+.foot a{color:var(--ink);font-weight:800;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:2px}
+
+/* Toast */
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top));z-index:200;transform:translate(-50%,-30px);opacity:0;background:var(--white);color:var(--ink);padding:13px 20px;border-radius:16px;font-weight:800;font-size:.9rem;box-shadow:0 5px 0 var(--edge),0 14px 26px rgba(60,40,0,.3);transition:.35s cubic-bezier(.2,.7,.2,1);display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);pointer-events:none}
+.toast .ic{color:var(--green)}
+.toast.err-t{background:var(--ink);color:var(--gold)}
+.toast.err-t .ic{color:#FF8A8A}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- Layar penuh ---------- */
+body{display:block;padding:0;min-height:100dvh}
+body::before,body::after{content:"";position:fixed;border-radius:50%;pointer-events:none;z-index:0}
+body::before{width:min(70vw,620px);aspect-ratio:1;right:-18vw;top:-14vh;background:radial-gradient(circle,rgba(255,246,206,.9),transparent 65%)}
+body::after{width:min(60vw,520px);aspect-ratio:1;left:-16vw;bottom:-14vh;background:radial-gradient(circle,rgba(26,20,4,.18),transparent 65%)}
+.stage{max-width:none;min-height:100dvh;justify-content:center;gap:30px;position:relative;z-index:1;
+  padding:calc(env(safe-area-inset-top) + 40px) 22px calc(env(safe-area-inset-bottom) + 40px)}
+.brand{flex-direction:column;align-items:flex-start;gap:18px;padding:0}
+.mark{width:72px;height:72px;border-radius:24px}
+.mark .ic{width:34px;height:34px}
+.brand h1{font-size:clamp(2.2rem,8vw,3.4rem)}
+.brand p{font-size:1.02rem}
+.card{width:100%;max-width:480px;padding:28px 24px;border-radius:32px}
+@media (min-width:900px){
+  .stage{display:grid;grid-template-columns:1fr minmax(0,460px);align-items:center;gap:8vw;padding:64px 9vw}
+  .brand{gap:24px}
+  .brand h1{font-size:clamp(3.4rem,6vw,5rem)}
+  .card{justify-self:end;padding:36px 34px}
+}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<main class="stage" id="stage">
+  <div class="brand">
+    <div class="mark" data-ic="bolt"></div>
+    <div>
+      <h1>AutoPanel</h1>
+      <p id="sub">Masuk untuk mengakses dashboard</p>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="tabs">
+      <button id="tabLogin" class="on" onclick="switchTab('login')"><span data-ic="lock"></span>Masuk</button>
+      <button id="tabRegister" onclick="switchTab('register')"><span data-ic="userPlus"></span>Daftar</button>
+    </div>
+
+    <div class="err hide" id="errBox"><span data-ic="alert"></span><span id="errTxt"></span></div>
+
+    <div class="field">
+      <label for="username">Username</label>
+      <div class="inp"><span data-ic="user"></span><input type="text" id="username" placeholder="contoh: budi123" autocomplete="username" maxlength="20"></div>
+      <small>Minimal 3 karakter, tanpa spasi.</small>
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <div class="inp">
+        <span data-ic="lock"></span>
+        <input type="password" id="password" placeholder="Masukkan password" autocomplete="current-password" maxlength="40">
+        <button type="button" class="eye" id="eyeBtn" aria-label="Lihat password" onclick="togglePw()" data-ic="eye"></button>
+      </div>
+      <small>Minimal 6 karakter.</small>
+    </div>
+
+    <button class="b3" id="submitBtn" onclick="submitAuth()"><span id="submitTxt">Masuk</span><span data-ic="arrow"></span></button>
+
+    <p class="foot" id="footTxt">Belum punya akun? <a href="#" id="footLink" onclick="switchTab('register');return false;">Daftar gratis</a></p>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- Ikon ---------- */
+const ICONS = {
+  bolt:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+  userPlus:'<circle cx="9" cy="8" r="4"/><path d="M2 21c.8-3.5 3.3-5 7-5s6.2 1.5 7 5"/><path d="M19 8v6M16 11h6"/>',
+  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  alert:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.6 6.6A17 17 0 0 0 2 12s3.5 6 10 6a10 10 0 0 0 4.4-1"/>',
+  check:'<path d="M5 12l5 5L20 7"/>'
+};
+const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+function paintIcons(root = document){ root.querySelectorAll('[data-ic]').forEach(el => el.innerHTML = ic(el.dataset.ic)); }
+const $ = id => document.getElementById(id);
+
+/* ---------- Efek mengetik ---------- */
+const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const pendingText = new WeakMap();
+let twToken = 0;
+function typeIn(...roots){
+  const token = ++twToken;
+  if (REDUCE_MOTION) return;
+  const items = [];
+  roots.forEach(root => {
+    if (!root) return;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => {
+      const p = n.parentElement;
+      if (!p || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if (p.closest('svg,script,style,.hide')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }});
+    let n; while ((n = w.nextNode())) items.push({node:n, text: pendingText.has(n) ? pendingText.get(n) : n.nodeValue});
+  });
+  if (!items.length) return;
+  const total = items.reduce((s,i) => s + i.text.length, 0);
+  const delay = Math.max(10, Math.min(34, 1200 / total));
+  items.forEach(i => { i.node.nodeValue = ''; pendingText.set(i.node, i.text); });
+  let idx = 0, pos = 0;
+  const step = () => {
+    if (token !== twToken) return;
+    if (idx >= items.length) { items.forEach(i => pendingText.delete(i.node)); return; }
+    const it = items[idx];
+    pos++;
+    it.node.nodeValue = it.text.slice(0, pos);
+    if (pos >= it.text.length){ idx++; pos = 0; setTimeout(step, delay * 4); }
+    else setTimeout(step, delay * (0.6 + Math.random() * 0.8));
+  };
+  step();
+}
+
+/* ---------- Data ---------- */
+const DB = {
+  get(k,d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } },
+  set(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+};
+const todayStr = () => new Date().toISOString().slice(0,10);
+async function sha256(str){
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ---------- Mode ---------- */
+let mode = 'login';
+const COPY = {
+  login:{ sub:'Masuk untuk mengakses dashboard', btn:'Masuk', foot:'Belum punya akun?', link:'Daftar gratis' },
+  register:{ sub:'Buat akun baru, gratis!', btn:'Daftar', foot:'Sudah punya akun?', link:'Masuk di sini' }
+};
+function switchTab(m){
+  mode = m;
+  $('tabLogin').classList.toggle('on', m === 'login');
+  $('tabRegister').classList.toggle('on', m === 'register');
+  const c = COPY[m];
+  $('sub').textContent = c.sub;
+  $('submitTxt').textContent = c.btn;
+  $('footTxt').firstChild.textContent = c.foot + ' ';
+  $('footLink').textContent = c.link;
+  $('footLink').onclick = e => { e.preventDefault(); switchTab(m === 'login' ? 'register' : 'login'); };
+  hideError();
+  typeIn($('stage'));
+}
+
+/* ---------- Pesan ---------- */
+function showError(msg){ $('errTxt').textContent = msg; $('errBox').classList.remove('hide'); $('errBox').style.animation = 'none'; void $('errBox').offsetWidth; $('errBox').style.animation = ''; }
+function hideError(){ $('errBox').classList.add('hide'); }
+let tt;
+function toast(msg, isErr){
+  const t = $('toast');
+  t.innerHTML = (isErr ? '' : ic('check')) + `<span>${msg.replace(/[<>&]/g, '')}</span>`;
+  t.className = 'toast on' + (isErr ? ' err-t' : '');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2800);
+}
+
+function togglePw(){
+  const p = $('password'); const show = p.type === 'password';
+  p.type = show ? 'text' : 'password';
+  $('eyeBtn').innerHTML = ic(show ? 'eyeOff' : 'eye');
+  $('eyeBtn').setAttribute('aria-label', show ? 'Sembunyikan password' : 'Lihat password');
+}
+
+/* ---------- Submit ---------- */
+async function submitAuth(){
+  hideError();
+  const username = $('username').value.trim();
+  const password = $('password').value;
+
+  if (username.length < 3) return showError('Username minimal 3 karakter.');
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) return showError('Username hanya boleh huruf, angka, dan underscore (_).');
+  if (password.length < 6) return showError('Password minimal 6 karakter.');
+
+  const btn = $('submitBtn');
+  btn.disabled = true;
+  try {
+    const users = DB.get('users', {});
+    const passHash = await sha256(password);
+
+    if (mode === 'register') {
+      if (users[username]) return showError('Username sudah dipakai. Coba yang lain.');
+      users[username] = {
+        username, passHash, saldo:0, panels:[], nokos:[], roles:[],
+        limitDate: todayStr(), limits:{}, createdAt: new Date().toISOString()
+      };
+      DB.set('users', users);
+      DB.set('current_user', username);
+      toast('Akun dibuat. Selamat datang, ' + username);
+      setTimeout(() => location.href = 'app.html', 900);
+    } else {
+      const user = users[username];
+      if (!user) return showError('Username tidak ditemukan. Daftar dulu?');
+      const savedHash = user.passHash || user.pwdHash;
+      if (savedHash && savedHash !== passHash) return showError('Password salah.');
+      if (!savedHash) { users[username].passHash = passHash; DB.set('users', users); }
+      DB.set('current_user', username);
+      toast('Login berhasil');
+      setTimeout(() => location.href = 'app.html', 700);
+    }
+  } finally {
+    setTimeout(() => btn.disabled = false, 900);
+  }
+}
+
+/* Redirect jika sudah login */
+if (DB.get('current_user', null)) location.href = 'app.html';
+
+['username','password'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); }));
+
+/* ---------- Init ---------- */
+paintIcons();
+switchTab('login');
+typeIn($('stage'));
+</script>
+</body>
+</html>
