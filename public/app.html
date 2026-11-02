@@ -441,6 +441,29 @@ body.fs .top,body.fs .nav{display:none}
 <div class="toast" id="toast"></div>
 
 <script>
+/* ---------- API CONFIG VERCEL ---------- */
+const API_BASE = ''; 
+let token = localStorage.getItem('token');
+let me = null;
+let order = {type:null, idx:null};
+let orderTab = 'panel';
+let aiBusy = false;
+
+async function api(path, method = 'GET', body = null, isForm = false) {
+  const headers = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (!isForm && body) headers['Content-Type'] = 'application/json';
+
+  const res = await fetch(API_BASE + path, {
+    method,
+    headers,
+    body: isForm ? body : (body ? JSON.stringify(body) : null)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Terjadi kesalahan');
+  return data;
+}
+
 /* ---------- Ikon ---------- */
 const ICONS = {
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
@@ -513,20 +536,12 @@ const TAB_DESC = {
 const AI_ENDPOINT = 'https://apiii-xrina.my.id/ai/gpt';
 const AI_HISTORY_KEY = () => 'ai_history_' + (me || 'guest');
 
-/* ---------- State ---------- */
-let me = DB.get('current_user', null);
-let order = {type:null, idx:null};
-let orderTab = 'panel';
-let aiBusy = false;
-
-function allUsers() { return DB.get('users', {}); }
-function myData() { return me ? allUsers()[me] : null; }
-function ensureUser() {
-  if (!me) return;
-  const all = allUsers();
-  if (!all[me]) { all[me] = {saldo:0, panels:[], nokos:[], roles:[], limitDate:todayStr(), limits:{}}; DB.set('users', all); }
-}
-function saveMe(u) { const all = allUsers(); all[me] = u; DB.set('users', all); }
+/* ---------- State (Localstorage to API bridge) ---------- */
+// me sekarang diambil dari API
+function allUsers() { return DB.get('users', {}); } // Tetap dipakai untuk fungsi lokal
+function myData() { return me; }
+function ensureUser() {} 
+function saveMe(u) { me = u; } // Update data lokal
 
 /* ---------- Efek mengetik ---------- */
 const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -576,23 +591,24 @@ function toast(msg, err) {
 
 /* ---------- Render ---------- */
 function renderHeader() {
-  const u = myData();
-  const bal = u ? u.saldo || 0 : 0;
-  $('uname').textContent = me ? (u?.displayName || me) : 'Belum login';
-  $('av').innerHTML = avHtml(u);
-  $('urole').textContent = me ? (u?.roles?.length ? u.roles[u.roles.length - 1].name : 'Member') : 'Login untuk mulai belanja';
+  const bal = me ? me.saldo || 0 : 0;
+  $('uname').textContent = me ? me.username : 'Memuat...';
+  $('av').innerHTML = avHtml(me);
+  $('urole').textContent = me ? me.role : 'Member';
   $('balTxt').textContent = rp(bal);
   $('heroAmt').textContent = rp(bal);
 }
+
 function renderStats() {
   const u = myData() || {panels:[], nokos:[], roles:[]};
-  const v = [u.panels.length, u.nokos.length, u.roles.length];
+  const v = [u.panels?.length || 0, u.nokos?.length || 0, u.roles?.length || 0];
   const max = Math.max(...v, 1);
   ['Panel', 'Nokos', 'Role'].forEach((k, i) => {
     $('s' + k).textContent = v[i];
     requestAnimationFrame(() => $('m' + k).style.width = (v[i] / max * 100) + '%');
   });
 }
+
 function renderOrder() {
   const t = orderTab;
   document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
@@ -628,6 +644,7 @@ function renderOrder() {
   $('orderBody').innerHTML = html;
   paintIcons($('orderBody'));
 }
+
 function renderPanels() {
   if (!me) {
     $('limitBox').innerHTML = '';
@@ -635,138 +652,40 @@ function renderPanels() {
     paintIcons($('panelList'));
     return;
   }
-  // Bersihkan panel expired otomatis
-  const u = myData();
-  if (u && u.panels && u.panels.length) {
-    const now = new Date();
-    const before = u.panels.length;
-    u.panels = u.panels.filter(p => new Date(p.expiresAt) > now);
-    if (u.panels.length !== before) saveMe(u);
-  }
-
-  // Render limit box
+  
   renderLimitBox();
 
-  // Render panel list
-  const list = (myData()?.panels) || [];
+  const list = me.panels || [];
   if (!list.length) {
     $('panelList').innerHTML = `<div class="empty"><div class="tile" data-ic="server"></div>Belum ada panel.<br>Order dari menu Order, lalu pilih Panel.</div>`;
     paintIcons($('panelList'));
     return;
   }
   $('panelList').innerHTML = list.map(p => {
-    const left = Math.ceil((new Date(p.expiresAt) - new Date()) / 864e5);
-    const cls = left <= 0 ? 'dead' : left <= 5 ? 'warn' : '';
     return `<div class="card">
-      <div class="row1"><div class="nm"><span class="tile">${ic('server')}</span><span>${esc(p.name)}</span></div><span class="badge ${cls}">${left > 0 ? left + ' hari lagi' : 'Expired'}</span></div>
+      <div class="row1"><div class="nm"><span class="tile">${ic('server')}</span><span>${esc(p.name)}</span></div><span class="badge">Aktif</span></div>
       <div class="kv">
         <span>RAM</span><span>${esc(p.ram)}</span>
-        <span>Domain</span><span>${esc(p.domain)}</span>
-        <span>Username</span><span>${esc(p.panelUsername)}</span>
-        <span>Password</span><span>${esc(p.password)}</span>
-        <span>Dibuat</span><span>${new Date(p.createdAt).toLocaleDateString('id-ID')}</span>
+        <span>Domain</span><span>${esc(p.domain || 'https://panel.domainmu.com')}</span>
+        <span>Username</span><span>${esc(p.panel_username || me.username)}</span>
+        <span>Password</span><span>${esc(p.password || '******')}</span>
       </div></div>`;
   }).join('');
   paintIcons($('panelList'));
 }
 
 /* ---------- LIMIT HARIAN ROLE ---------- */
-function ensureLimitReset(u) {
-  if (!u) return null;
-  const today = todayStr();
-  if (u.limitDate !== today) {
-    u.limitDate = today;
-    u.limits = {};
-    saveMe(u);
-  }
-  return u;
-}
-function getLimitStatus() {
-  const u = ensureLimitReset(myData());
-  if (!u || !u.roles || !u.roles.length) return [];
-  return u.roles.map(r => {
-    const used = (u.limits && u.limits[r.name]) || 0;
-    return {name: r.name, limit: r.limit, used, sisa: Math.max(0, r.limit - used)};
-  });
-}
-function renderLimitBox() {
-  const status = getLimitStatus();
-  if (!status.length) { $('limitBox').innerHTML = ''; return; }
-  const total = status.reduce((s, x) => s + x.sisa, 0);
-  const badge = total > 0 ? `<span class="badge" style="background:var(--green);color:#fff;">${total} tersisa</span>` : `<span class="badge dead">Habis</span>`;
-  $('limitBox').innerHTML = `
-    <button class="rich" onclick="openLimitPanel()" style="margin-bottom:16px;">
-      <div class="tile light" data-ic="bolt"></div>
-      <div class="body"><div class="ttl">Panel gratis (role)</div><div class="sub">Klaim limit panel gratis dari role kamu</div></div>
-      ${badge}
-      <span class="chev" data-ic="chevron"></span>
-    </button>`;
-  paintIcons($('limitBox'));
-}
-function openLimitPanel() {
-  if (!requireLogin()) return;
-  const status = getLimitStatus();
-  if (!status.length) { toast('Kamu belum punya role. Beli dulu di menu Order → Role', true); return; }
-  $('limitList').innerHTML = status.map(s => {
-    const cls = s.sisa === 0 ? 'habis' : s.sisa === s.limit ? 'full' : '';
-    const btn = s.sisa > 0
-      ? `<button class="b3 sm" onclick="klaimLimit('${esc(s.name)}')">Buat panel</button>`
-      : `<span class="badge dead">Habis</span>`;
-    return `<div class="card" style="margin-bottom:10px;">
-      <div class="row1">
-        <div class="nm"><span class="tile">${ic('shield')}</span><span>${esc(s.name)}</span></div>
-        <span class="badge ${cls}">${s.sisa}/${s.limit}</span>
-      </div>
-      <div class="role-foot">
-        <span class="desc">Sisa ${s.sisa} dari ${s.limit} hari ini</span>
-        ${btn}
-      </div>
-    </div>`;
-  }).join('');
-  paintIcons($('limitList'));
-  open('mLimit');
-}
-function klaimLimit(roleName) {
-  const u = ensureLimitReset(myData());
-  if (!u) return;
-  const role = u.roles.find(r => r.name === roleName);
-  if (!role) { toast('Role tidak ditemukan', true); return; }
-  const used = (u.limits && u.limits[roleName]) || 0;
-  if (used >= role.limit) { toast('Limit ' + roleName + ' sudah habis hari ini', true); return; }
+// Karena menggunakan API, fungsi limit kita ubah jadi fungsi dummy
+// yang menyesuaikan data dari server (jika ada)
+function ensureLimitReset(u) { return u; }
+function getLimitStatus() { return []; }
+function renderLimitBox() { $('limitBox').innerHTML = ''; }
+function openLimitPanel() { toast('Fitur limit butuh API backend', true); }
+function klaimLimit() { toast('Fitur limit butuh API backend', true); }
 
-  // Minta nama server
-  const name = prompt('Nama server untuk panel gratis:');
-  if (!name || name.trim().length < 3) { toast('Nama server minimal 3 karakter', true); return; }
-  const username = prompt('Username panel:', me + '_' + roleName.toLowerCase().slice(0, 6)) || (me + '_panel');
-  if (!username || username.length < 3) { toast('Username panel minimal 3 karakter', true); return; }
-
-  // Pakai limit + buat panel
-  if (!u.limits) u.limits = {};
-  u.limits[roleName] = used + 1;
-  const settings = DB.get('admin_settings', {});
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let pwd = ''; for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
-  const now = new Date();
-  u.panels.push({
-    id:'SRV-' + Date.now(), name:name.trim(), ram:'2 GB', harga:0,
-    domain: settings.panelDomain || settings.pteroUrl || 'https://panel.autopanel.com',
-    panelUsername: username, password: pwd,
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + 30 * 864e5).toISOString(),
-    status:'active', gratis:true, roleAsal: roleName
-  });
-  saveMe(u);
-  close('mLimit');
-  renderPanels();
-  renderHeader();
-  renderStats();
-  toast('🎁 Panel gratis dibuat! Sisa limit ' + (role.limit - used - 1));
-}
-
-/* ---------- AI ---------- */
+/* ---------- AI (Nyata via API Vercel) ---------- */
 function getAIHistory(){ return DB.get(AI_HISTORY_KEY(), []); }
 function saveAIHistory(arr){ DB.set(AI_HISTORY_KEY(), arr.slice(-40)); }
-
 function formatAI(t) {
   if (!t) return '';
   let s = String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -796,7 +715,6 @@ function appendAIBubble(role, text, opts = {}) {
   }
   feed.appendChild(div);
   feed.scrollTop = feed.scrollHeight;
-  return div;
 }
 function showAITyping() {
   const feed = $('aiFeed');
@@ -892,7 +810,7 @@ function resetAI() {
   toast('Chat AI direset');
 }
 
-/* ---------- Chat ---------- */
+/* ---------- Chat (Simulasi Lokal karena Vercel tidak support Socket) ---------- */
 function renderChat() {
   const box = $('feed');
   const msgs = DB.get('public_chat', []);
@@ -908,6 +826,27 @@ function renderChat() {
       <div class="t">${new Date(m.time).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}</div></div>`;
   }).join('');
   box.scrollTop = box.scrollHeight;
+}
+function sendChat() {
+  const el = $('chatIn');
+  const text = el.value.trim();
+  if (!text) return;
+  if (!requireLogin()) return;
+  const msgs = DB.get('public_chat', []);
+  msgs.push({user:me.username, type:'text', text, time:new Date().toISOString()});
+  DB.set('public_chat', msgs);
+  el.value = ''; renderChat();
+}
+async function sendFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  if (!requireLogin()) { e.target.value = ''; return; }
+  if (f.size > 2 * 1024 * 1024) { e.target.value = ''; return toast('File maksimal 2MB (demo)', true); }
+  const data = await readFile(f);
+  const type = f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : 'file';
+  const msgs = DB.get('public_chat', []);
+  msgs.push({user:me.username, type, data, filename:f.name, time:new Date().toISOString()});
+  DB.set('public_chat', msgs);
+  e.target.value = ''; renderChat();
 }
 
 /* ---------- Navigation ---------- */
@@ -934,10 +873,6 @@ function showTab(tab) {
   renderOrder();
   typeIn($('p-order'));
 }
-$('seg').addEventListener('click', e => {
-  const b = e.target.closest('button');
-  if (b) { orderTab = b.dataset.t; renderOrder(); typeIn($('orderBody')); }
-});
 
 /* ---------- Sheets ---------- */
 function open(id) { $(id).classList.add('on'); typeIn($(id).querySelector('.sheet')); }
@@ -962,12 +897,19 @@ async function submitDeposit() {
   if (!amount || amount < 1000) return toast('Nominal minimal Rp 1.000', true);
   const f = document.querySelector('#mDeposit input[type=file]').files[0];
   if (!f) return toast('Upload bukti transfer dulu', true);
-  const bukti = await readFile(f);
-  const reqs = DB.get('pending_topups', []);
-  reqs.push({id:'TOP-' + Date.now(), user:me, amount, bukti, status:'pending', createdAt:new Date().toISOString()});
-  DB.set('pending_topups', reqs);
-  close('mDeposit');
-  toast('Deposit terkirim ke admin');
+  
+  const fd = new FormData();
+  fd.append('amount', amount);
+  fd.append('bukti', f);
+
+  try {
+    // Panggil API Vercel untuk topup
+    await api('/api/topup', 'POST', fd, true);
+    close('mDeposit');
+    toast('Deposit terkirim ke admin');
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
 function openOrder(type, idx) {
@@ -986,7 +928,7 @@ function openOrder(type, idx) {
   $('oTitle').textContent = title;
   $('oSum').innerHTML = rows.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('');
   $('oPanelFields').classList.toggle('hide', !isPanel);
-  $('oUser').value = isPanel ? me + '_panel' : '';
+  $('oUser').value = isPanel ? me.username + '_panel' : '';
   $('oServer').value = '';
   $('oPay').value = 'saldo';
   $('oQrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=QRIS-DEMO-' + type.toUpperCase();
@@ -1001,7 +943,6 @@ function togglePay() { $('oQris').classList.toggle('hide', $('oPay').value !== '
 async function submitOrder() {
   const {type, idx} = order;
   const item = type === 'panel' ? PANELS[idx] : type === 'nokos' ? NOKOS[idx] : ROLES[idx];
-  const price = item.harga;
   const isPanel = type === 'panel';
   const username = $('oUser').value.trim();
   const server = $('oServer').value.trim();
@@ -1009,86 +950,48 @@ async function submitOrder() {
   if (isPanel && server.length < 3) return toast('Nama server minimal 3 karakter', true);
 
   const method = $('oPay').value;
-  const u = myData();
-
-  if (method === 'saldo') {
-    if (u.saldo < price) return toast('Saldo tidak cukup', true);
-    u.saldo -= price;
-    if (type === 'panel') createPanel(u, item, server, username);
-    if (type === 'nokos') u.nokos.push({id:'NK-' + Date.now(), name:item.name, harga:price, otp:'(menunggu API)', createdAt:new Date().toISOString()});
-    if (type === 'role') {
-      const existing = u.roles.find(r => r.name === item.name);
-      if (existing) { existing.boughtAt = new Date().toISOString(); existing.limit = item.limit; }
-      else { u.roles.push({id:'R-' + Date.now(), name:item.name, limit:item.limit, boughtAt:new Date().toISOString()}); }
-      if (u.limitDate !== todayStr()) { u.limitDate = todayStr(); u.limits = {}; }
-      u.limits[item.name] = 0;
-    }
-    saveMe(u);
-    close('mOrder'); renderHeader(); renderStats();
-    if (type === 'panel') { toast('Panel berhasil dibuat'); go('saya'); }
-    else if (type === 'nokos') toast('Nokos dibeli. OTP menunggu API');
-    else toast('Role ' + item.name + ' aktif. Limit ' + item.limit + 'x/hari');
-    return;
+  
+  const fd = new FormData();
+  fd.append('type', type);
+  fd.append('item', item.name || item.ram);
+  fd.append('pay_method', method);
+  
+  let detail = {};
+  if (isPanel) {
+    detail.serverName = server;
+    detail.panelUsername = username;
+  }
+  fd.append('detail', JSON.stringify(detail));
+  
+  const file = document.querySelector('#mOrder input[type=file]').files[0];
+  if (method === 'qris') {
+    if (!file) return toast('Upload bukti dulu', true);
+    fd.append('bukti', file);
   }
 
-  const f = document.querySelector('#mOrder input[type=file]').files[0];
-  if (!f) return toast('Upload bukti dulu', true);
-  const bukti = await readFile(f);
-  const orders = DB.get('pending_orders', []);
-  orders.push({id:'ORD-' + Date.now(), type, user:me, item:item.name || item.ram, ram:item.ram, role:item.name, service:item.name, harga:price, serverName:server, panelUsername:username, bukti, status:'pending', createdAt:new Date().toISOString()});
-  DB.set('pending_orders', orders);
-  close('mOrder');
-  toast('Order terkirim, tunggu approve admin');
-}
-
-function createPanel(u, p, serverName, panelUsername) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let pwd = ''; for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
-  const settings = DB.get('admin_settings', {});
-  const now = new Date();
-  u.panels.push({
-    id:'SRV-' + Date.now(), name:serverName, ram:p.ram, harga:p.harga,
-    domain: settings.panelDomain || settings.pteroUrl || 'https://panel.autopanel.com',
-    panelUsername, password:pwd, createdAt:now.toISOString(),
-    expiresAt:new Date(now.getTime() + 30 * 864e5).toISOString(), status:'active'
-  });
-}
-
-/* ---------- Chat ---------- */
-function sendChat() {
-  const el = $('chatIn');
-  const text = el.value.trim();
-  if (!text) return;
-  if (!requireLogin()) return;
-  const msgs = DB.get('public_chat', []);
-  msgs.push({user:me, type:'text', text, time:new Date().toISOString()});
-  DB.set('public_chat', msgs);
-  el.value = ''; renderChat();
-}
-async function sendFile(e) {
-  const f = e.target.files[0]; if (!f) return;
-  if (!requireLogin()) { e.target.value = ''; return; }
-  if (f.size > 2 * 1024 * 1024) { e.target.value = ''; return toast('File maksimal 2MB (demo)', true); }
-  const data = await readFile(f);
-  const type = f.type.startsWith('image/') ? 'image' : f.type.startsWith('video/') ? 'video' : 'file';
-  const msgs = DB.get('public_chat', []);
-  msgs.push({user:me, type, data, filename:f.name, time:new Date().toISOString()});
-  DB.set('public_chat', msgs);
-  e.target.value = ''; renderChat();
+  try {
+    const res = await api('/api/order', 'POST', fd, true);
+    toast(res.message);
+    close('mOrder');
+    // Refresh halaman karena data user akan berubah (saldo/panel)
+    setTimeout(() => window.location.reload(), 2000);
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
 /* ---------- Pengaturan akun ---------- */
 function avHtml(u) {
-  if (!me) return '?';
-  return u?.avatar ? `<img src="${u.avatar}" alt="">` : esc(me.charAt(0).toUpperCase());
+  if (!u) return '?';
+  return u.avatar ? `<img src="${u.avatar}" alt="">` : esc(u.username.charAt(0).toUpperCase());
 }
 function renderAll() { renderHeader(); renderStats(); renderOrder(); }
 function renderSettings() {
   if (!me) { go('home'); toast('Login dulu ya', true); return; }
   const u = myData();
   $('setAv').innerHTML = avHtml(u);
-  $('setName').textContent = u.displayName || me;
-  $('setUser').textContent = '@' + me;
+  $('setName').textContent = u.username;
+  $('setUser').textContent = '@' + u.username;
 }
 let setMode = null;
 const SET_CFG = {
@@ -1102,82 +1005,56 @@ function openSet(mode) {
   $('setTitle').textContent = c.title;
   $('setLabel').textContent = c.label;
   $('setInput').placeholder = c.ph;
-  $('setInput').value = mode === 'name' ? (myData().displayName || me) : me;
+  $('setInput').value = mode === 'name' ? (myData().displayName || me.username) : me.username;
   open('mSet');
 }
-function saveSet() {
-  const v = $('setInput').value.trim();
-  const all = allUsers();
-  if (setMode === 'name') {
-    if (v.length < 2 || v.length > 30) return toast('Nama harus 2-30 karakter', true);
-    all[me].displayName = v;
-    DB.set('users', all);
-  } else {
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(v)) return toast('Username 3-20 karakter: huruf, angka, atau _', true);
-    if (v === me) { close('mSet'); return; }
-    if (all[v]) return toast('Username sudah dipakai', true);
-    all[v] = all[me];
-    delete all[me];
-    DB.set('users', all);
-    const rename = (key, arr) => DB.set(key, DB.get(key, []).map(x => x.user === me ? {...x, user: v} : x));
-    rename('pending_orders'); rename('pending_topups'); rename('public_chat');
-    me = v;
-    DB.set('current_user', me);
-  }
-  close('mSet');
-  renderAll();
-  renderSettings();
-  toast('Perubahan disimpan');
-}
-async function changePhoto(e) {
-  const f = e.target.files[0];
-  e.target.value = '';
-  if (!f || !requireLogin()) return;
-  if (f.size > 2 * 1024 * 1024) return toast('Foto maksimal 2MB', true);
-  const data = await readFile(f);
-  const all = allUsers();
-  all[me].avatar = data;
-  DB.set('users', all);
-  renderAll();
-  renderSettings();
-  toast('Foto profil diperbarui');
-}
-async function hashPw(s) {
-  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
-function openPwd() {
-  if (!requireLogin()) return;
-  $('pw1').value = ''; $('pw2').value = '';
-  open('mPwd');
-}
-async function savePwd() {
-  const a = $('pw1').value, b = $('pw2').value;
-  if (a.length < 6) return toast('Password minimal 6 karakter', true);
-  if (a !== b) return toast('Konfirmasi password tidak sama', true);
-  const all = allUsers();
-  all[me].pwdHash = await hashPw(a);
-  DB.set('users', all);
-  close('mPwd');
-  toast('Password berhasil direset');
-}
+function saveSet() { close('mSet'); toast('Fitur pengaturan butuh backend', true); }
+function openPwd() { open('mPwd'); }
+function savePwd() { close('mPwd'); toast('Fitur password butuh backend', true); }
+function changePhoto() { toast('Fitur foto butuh backend', true); }
+
 function logout() {
-  if (!me) return;
   if (!confirm('Keluar dari akun ini?')) return;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
   me = null;
-  DB.set('current_user', null);
-  renderAll();
-  go('home');
-  toast('Kamu sudah keluar');
+  window.location.href = '/login';
 }
 
-/* ---------- Init ---------- */
-paintIcons();
-ensureUser();
-renderHeader();
-renderStats();
-renderOrder();
-typeIn(document.querySelector('.top'), document.querySelector('.nav'), $('p-home'));
+/* ---------- INIT APP (Bridge to API) ---------- */
+async function initApp() {
+  if (!token) {
+    window.location.href = '/login';
+    return;
+  }
+
+  try {
+    // Karena backend Vercel belum punya /api/me, kita ambil data dari localStorage
+    // (Nanti jika backend sudah punya /api/me, ganti dengan await api('/api/me'))
+    const cached = JSON.parse(localStorage.getItem('user') || '{}');
+    me = {
+      username: cached.username || 'User Vercel',
+      saldo: cached.saldo || 0,
+      role: cached.role || 'user',
+      panels: cached.panels || [],
+      nokos: cached.nokos || [],
+      roles: cached.roles || []
+    };
+
+    paintIcons();
+    renderHeader();
+    renderStats();
+    renderOrder();
+    renderChat();
+    renderAIHistory();
+    renderSettings();
+    typeIn(document.querySelector('.top'), document.querySelector('.nav'), $('p-home'));
+  } catch (e) {
+    logout();
+  }
+}
+
+initApp();
 </script>
 </body>
 </html>
